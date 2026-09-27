@@ -1,0 +1,10 @@
+node_modules
+dist
+dev-dist
+.env
+.env.local
+__pycache__
+*.pyc
+data/meta/last_error.log
+.DS_Store
+.vercel
