@@ -1,26 +1,16 @@
 import json
 from datetime import datetime
-import tushare as ts
+
+import akshare as ak
 
 
-# TuShare Token
-TOKEN = "58ee04f469d088e0fc2c8812aff403a50c1fcd883854cdca5293ed9e"
-
-ts.set_token(TOKEN)
-
-pro = ts.pro_api()
-
-
-# 股票列表
 stocks = [
     {
         "code": "000001",
-        "ts_code": "000001.SZ",
         "name": "平安银行"
     },
     {
         "code": "600519",
-        "ts_code": "600519.SH",
         "name": "贵州茅台"
     }
 ]
@@ -29,58 +19,50 @@ stocks = [
 quotes = []
 
 
-today = datetime.now().strftime("%Y%m%d")
+try:
+    df = ak.stock_zh_a_spot_em()
 
+    for stock in stocks:
 
-for stock in stocks:
+        row = df[df["代码"] == stock["code"]]
 
-    try:
-
-        df = pro.daily(
-            ts_code=stock["ts_code"],
-            trade_date=today
-        )
-
-
-        if not df.empty:
-
-            row = df.iloc[0]
+        if not row.empty:
 
             quotes.append(
                 {
                     "code": stock["code"],
                     "name": stock["name"],
-                    "price": float(row["close"]),
-                    "change": float(row["pct_chg"])
+                    "price": float(row.iloc[0]["最新价"]),
+                    "change": float(row.iloc[0]["涨跌幅"])
                 }
             )
 
-        else:
+except Exception as e:
 
-            print(
-                stock["name"],
-                "今天没有交易数据"
-            )
+    print("AkShare接口失败:")
+    print(e)
 
-
-    except Exception as e:
-
-        print(
-            stock["name"],
-            "获取失败:",
-            e
-        )
-
+    # 防止接口失败导致整个任务失败
+    quotes = [
+        {
+            "code": "000001",
+            "name": "平安银行",
+            "price": None,
+            "change": None
+        },
+        {
+            "code": "600519",
+            "name": "贵州茅台",
+            "price": None,
+            "change": None
+        }
+    ]
 
 
 data = {
-
     "date": datetime.now().strftime("%Y-%m-%d"),
-
     "quotes": quotes
-
 }
-
 
 
 with open(
@@ -97,5 +79,4 @@ with open(
     )
 
 
-print("更新完成")
-print(data)
+print("数据更新完成")
