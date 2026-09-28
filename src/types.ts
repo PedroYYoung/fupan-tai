@@ -162,3 +162,18 @@ export interface Conclusion {
   emotion: ConclusionItem
   score: number
 }
+
+// ===== 自选股行情契约（public/data/quotes.json，由 scripts/update_data.py 生成）=====
+// 与主数据（daily/series）独立：quotes 是盘中/收盘快照，date 为 YYYY-MM-DD 自然日；
+// 主数据 trade_date 为 YYYYMMDD 交易日。两者在 store 中分别管理，互不强约束。
+export interface QuoteItem {
+  code: string
+  name: string
+  price: number | null   // null 表示缺失（接口失败/停牌/退市），绝不置 0
+  change: number | null  // 涨跌幅数值，8.5 表示 8.5%
+}
+
+export interface QuotesFile {
+  date: string           // YYYY-MM-DD
+  quotes: QuoteItem[]
+}

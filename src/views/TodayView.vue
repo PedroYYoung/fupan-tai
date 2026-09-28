@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useDataStore } from '../stores/data'
 import { conclude, type BucketPt } from '../rules/engine'
 import MetricCard from '../components/MetricCard.vue'
@@ -44,6 +44,23 @@ const canDraw = computed(() => {
   const n = store.allSampleN()
   return !store.insufficient(n)
 })
+
+// ===== 自选股行情（store 统一管理，失败不影响主数据）=====
+const quotesFile = computed(() => store.quotes)
+const quotesError = computed(() => store.quotesError)
+onMounted(() => store.loadQuotes())
+
+function fmtPrice(n: number | null): string {
+  return n == null ? '—' : n.toFixed(2)
+}
+function fmtChange(n: number | null): string {
+  if (n == null) return '—'
+  return (n > 0 ? '+' : '') + n.toFixed(2) + '%'
+}
+function changeClass(n: number | null): string {
+  if (n == null) return 'muted'
+  return n > 0 ? 'up' : n < 0 ? 'down' : ''
+}
 </script>
 
 <template>
@@ -87,6 +104,33 @@ const canDraw = computed(() => {
         <strong>自动结论</strong>（综合评分 <span class="num">{{ conclusion.score }}</span>/100）：
         {{ conclusion.fund.text }}；{{ conclusion.structure.text }}；{{ conclusion.emotion.text }}
         <div class="basis">{{ conclusion.fund.basis }}</div>
+      </div>
+
+      <!-- 自选股行情：数据 /data/quotes.json（scripts/update_data.py 每日更新） -->
+      <div class="card">
+        <div class="card-title">📈 自选股行情</div>
+        <div class="card-desc">
+          更新时间：<span class="num">{{ quotesFile?.date ?? '—' }}</span>
+          · 清单维护：public/data/stocks.json
+        </div>
+        <div v-if="quotesFile && quotesFile.quotes.length" class="table-wrap" style="margin-top:8px">
+          <table class="data">
+            <thead>
+              <tr><th>代码</th><th>名称</th><th>最新价</th><th>涨跌幅</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="q in quotesFile.quotes" :key="q.code">
+                <td class="num muted">{{ q.code }}</td>
+                <td>{{ q.name }}</td>
+                <td class="num">{{ fmtPrice(q.price) }}</td>
+                <td class="num" :class="changeClass(q.change)">{{ fmtChange(q.change) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-else class="empty-box" style="margin-top:8px">
+          🟡 {{ quotesError || '自选股清单为空，请在 public/data/stocks.json 中维护关注标的' }}
+        </div>
       </div>
 
       <div v-if="canDraw && sparks" class="card-grid cols-3" style="grid-template-columns: repeat(3, 1fr); margin-top: 6px;">

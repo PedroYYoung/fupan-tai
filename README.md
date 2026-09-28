@@ -19,18 +19,25 @@ python scripts/make_sample_data.py        # 重新生成内置演示数据
 python scripts/make_icons.py              # 重新生成 PWA 图标
 ```
 
-> 仓库已内置演示数据（`data/`）：字段结构与正式数据完全一致，数值为合理真实量级（种子随机的合成行情），首次 `build.py` 会覆盖。节假日窗口为近似值，正式数据以交易日历接口为准。
+> 仓库已内置演示数据（`public/data/`）：字段结构与正式数据完全一致，数值为合理真实量级（种子随机的合成行情），首次 `build.py` 会覆盖。节假日窗口为近似值，正式数据以交易日历接口为准。
 
-## data/ 目录结构
+## public/data/ 目录结构（统一数据根）
+
+**单一数据架构**：所有 JSON 数据只存在于 `public/data/` 一处——Vite dev 直接托管为 `/data/*`，构建时随 `dist/` 发布，Vercel/本地/CI 三端同构，无第二份拷贝、无同步步骤。数据管线（`build.py` / `update_data.py`）也直接写入此处。
 
 ```
-data/
+public/data/
 ├── meta/trading_days.json      # 交易日历 {list, latest, updated_at, source_versions}
-├── meta/last_error.log         # 构建失败记录（成功时不生成）
+├── meta/last_error.log         # 构建失败记录（成功时不生成，gitignore）
 ├── latest.json                 # {latest: "20260925", updated_at}
 ├── daily/YYYYMMDD.json         # 每日快照（overview/index_volume/widebase/concentration/liquidity/emotion + sparklines）
-└── series/*.json               # 历史序列（total_amount/margin/limit_up_down/limit_down/over_10e_count/index_amount_*），含预计算 rank_year/rank_1y/rank_all/pctile
+├── series/*.json               # 历史序列（total_amount/margin/limit_up_down/over_10e_count/index_amount_* 等），含预计算 rank/pctile
+├── stocks.json                 # 自选股清单（手动维护）：{"stocks":[{"code":"000001","name":"平安银行"}]}
+└── quotes.json                 # 自选股行情快照（scripts/update_data.py 生成）：{"date":"YYYY-MM-DD","quotes":[{code,name,price,change}]}
 ```
+
+- 主数据（daily/series/meta）与自选股行情（quotes.json）**解耦**：主数据按交易日 YYYYMMDD 组织、由 `build.py` 每日收盘后更新；quotes 按自然日 YYYY-MM-DD、可在盘中/收盘多次更新，前端 store 中分别管理、独立失败互不影响。
+- **扩展约定**（V2）：个股 K 线/历史走势放 `public/data/quotes/kline_{code}.json`，技术指标放 `series/indicator_*.json`，复盘记录沿用 `notesdb`（IndexedDB）或 `daily/` 扩展字段——均无需改动现有结构。
 
 金额单位统一「亿元」；百分比为数值（8.5 表示 8.5%）；日期 YYYYMMDD 字符串；null 表示缺失而非 0。
 契约扩展（向后兼容）：第一批新增 `daily.sparklines`；第二批新增 `concentration.top20/top50` 明细、
@@ -87,7 +94,7 @@ python scripts/build.py --incremental --backfill-days 250   # 回补最近 250 �
 4. 带百分位卡片右下角有「样本N=xxxx」；样本 N<30 显示「样本不足」且不画折线（阈值 `MIN_SAMPLE=30`，`src/stores/data.ts`）。
 5. `/?date=20200102` 正常渲染（演示数据含该日）；`/?date=20990101` 自动回退最新交易日 + 黄色提示条。
 6. 删除任一 `data/daily/*.json` 再访问该日：不白屏，黄色兜底文案并回退。
-7. `build.py` 中途 Ctrl+C：`data/` 无 `.tmp` 残留、无半份 json（`atomic_write_json` 先写临时文件再 `os.replace`）。
+7. `build.py` 中途 Ctrl+C：`public/data/` 无 `.tmp` 残留、无半份 json（`atomic_write_json` 先写临时文件再 `os.replace`）。
 8. `/report` 点「导出 PNG」：含日期、指标总表、三句结论，微信可直接查看。
 9. Chrome「安装应用」可用；Android「添加到主屏幕」后独立窗口、无地址栏、红色图标（#B7410E + 白字「复盘台」）。
 10. 口令：`.env.production` 设置 `VITE_GATE_HASH=<64位SHA-256>` 后构建，未解锁时页面 DOM 与源码中无任何指标数值。
@@ -95,7 +102,7 @@ python scripts/build.py --incremental --backfill-days 250   # 回补最近 250 �
 
 ## 已知限制（如实）
 
-- **演示数据非实盘**：内置 `data/` 为种子随机合成数据，量级参照真实市场；跑一次 `build.py` 即替换为实盘数据。
+- **演示数据非实盘**：内置 `public/data/` 为种子随机合成数据，量级参照真实市场；跑一次 `build.py` 即替换为实盘数据。
 - 行业页当日数据为东财行业板块口径；历史序列需申万指数回填，严格的「东财行业 ↔ 申万二级」成分映射需用户提供对齐表 CSV，
   之后运行 `python scripts/build.py --industry-backfill 对齐表.csv` 回填近一年（UI 已标注口径）。
 - 历史快照（daily/*.json）只能从启用日开始每日累积；历史日的 10亿以上/市值分档/集中度无法回补（东财快照仅实时可得），序列回补中两市成交额使用沪+深指数代理口径。

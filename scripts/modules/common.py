@@ -7,7 +7,9 @@ import time
 import datetime
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.path.join(REPO_ROOT, "data")
+# 统一数据根：public/data（Vite 直接静态托管 /data/*，构建时随 dist 发布，
+# 本地 dev / Vercel / CI 三端同构，不再维护第二份拷贝）
+DATA_DIR = os.path.join(REPO_ROOT, "public", "data")
 
 _req_count = 0
 

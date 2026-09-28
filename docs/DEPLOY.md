@@ -34,8 +34,8 @@ python scripts/make_sample_data.py
 3. **触发器**：新建 → 每天 18:40 → 启用。
 4. **操作**：新建 → 程序：`C:\Python311\python.exe`（你的实际路径）→ 参数：`scripts\build.py --incremental` → 起始于：仓库根目录，如 `D:\fupan-tai`。
 5. **设置**：勾选「如果任务失败，按以下频率重新启动」→ 1 次，间隔 5 分钟。
-6. 右键任务 → 运行，验证 `data/` 有新文件且 `git status` 出现变更。
-7. 配合 git 自动提交（可选）：在操作后追加第二条操作运行 `git_pull_commit_push.bat`（内容：`git add data/ && git commit -m "data: %date%" && git push`）。
+6. 右键任务 → 运行，验证 `public/data/` 有新文件且 `git status` 出现变更。
+7. 配合 git 自动提交（可选）：在操作后追加第二条操作运行 `git_pull_commit_push.bat`（内容：`git add public/data/ && git commit -m "data: %date%" && git push`）。
 
 Linux/NAS 用 crontab：`40 18 * * 1-5 cd /path/to/fupan-tai && python3 scripts/build.py --incremental`
 

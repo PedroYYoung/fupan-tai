@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { router } from '@/router'
-import type { DailyData, LatestPointer, SeriesFile, TradingDaysMeta } from '@/types'
+import type { DailyData, LatestPointer, QuotesFile, SeriesFile, TradingDaysMeta } from '@/types'
 
 const MIN_SAMPLE = 30
 
@@ -27,6 +27,24 @@ export const useDataStore = defineStore('data', () => {
 
   let metaLoaded = false
   const seriesCache = new Map<string, SeriesFile | null>()
+
+  // ===== 自选股行情（quotes.json，与主数据解耦，独立加载/独立失败）=====
+  const quotes = ref<QuotesFile | null>(null)
+  const quotesError = ref('')
+  let quotesLoaded = false
+
+  /** 加载自选股行情；失败不阻塞主数据，页面显示兜底文案 */
+  async function loadQuotes(force = false): Promise<void> {
+    if (quotesLoaded && !force) return
+    try {
+      quotes.value = await getJson<QuotesFile>('/data/quotes.json')
+      quotesError.value = ''
+    } catch {
+      quotes.value = null
+      quotesError.value = '自选股行情暂不可用'
+    }
+    quotesLoaded = true
+  }
 
   /** 序列文件按需加载 + 内存缓存（供各模块页复用） */
   async function getSeries(key: string): Promise<SeriesFile | null> {
@@ -138,6 +156,7 @@ export const useDataStore = defineStore('data', () => {
 
   return {
     loading, warnMsg, meta, latest, daily, currentDate, isFallback,
+    quotes, quotesError, loadQuotes,
     boot, getSeries, gotoDate, yearSampleN, allSampleN, oneYearSampleN, insufficient, formatDay
   }
 })

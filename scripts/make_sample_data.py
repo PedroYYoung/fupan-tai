@@ -13,7 +13,7 @@ import datetime
 
 random.seed(20260925)
 HERE = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.join(os.path.dirname(HERE), "data")
+DATA = os.path.join(os.path.dirname(HERE), "public", "data")
 
 # 年度量级基准（亿元）
 AMT_BASE = {2020: 8500, 2021: 10800, 2022: 9400, 2023: 9600, 2024: 11500, 2025: 13500, 2026: 14800}
