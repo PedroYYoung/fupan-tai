@@ -14,8 +14,11 @@ stocks = [
     }
 ]
 
-
-df = ak.stock_zh_a_spot_em()
+try:
+    df = ak.stock_zh_a_spot_em()
+except Exception as e:
+    print("接口失败:", e)
+    exit(1)
 
 
 quotes = []
