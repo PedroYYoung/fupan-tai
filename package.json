@@ -9,7 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@esbuild/win32-x64": "^0.28.2",
     "echarts": "^5.5.1",
     "html2canvas": "^1.4.1",
     "pinia": "^2.2.2",
