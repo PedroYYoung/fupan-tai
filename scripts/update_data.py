@@ -1,51 +1,25 @@
-import akshare as ak
 import json
 from datetime import datetime
 
 
-codes = [
-    "000001",
-    "600519"
-]
-
-
-result = []
-
-
-for code in codes:
-
-    df = ak.stock_zh_a_spot_em()
-
-    row = df[df["代码"] == code].iloc[0]
-
-    result.append(
-        {
-            "code": code,
-            "name": row["名称"],
-            "price": float(row["最新价"]),
-            "change": float(row["涨跌幅"])
-        }
-    )
-
-
 data = {
     "date": datetime.now().strftime("%Y-%m-%d"),
-    "quotes": result
+    "quotes": [
+        {
+            "code": "000001",
+            "name": "平安银行",
+            "price": 12.35,
+            "change": 1.25
+        },
+        {
+            "code": "600519",
+            "name": "贵州茅台",
+            "price": 1450,
+            "change": -0.35
+        }
+    ]
 }
 
 
-with open(
-    "public/data/quotes/latest.json",
-    "w",
-    encoding="utf-8"
-) as f:
-
-    json.dump(
-        data,
-        f,
-        ensure_ascii=False,
-        indent=2
-    )
-
-
-print("real market data updated")
+with open("public/data/quotes.json", "w", encoding="utf-8") as f:
+    json.dump(data, f, ensure_ascii=False, indent=2)
