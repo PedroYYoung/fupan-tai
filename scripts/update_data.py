@@ -14,7 +14,24 @@ stocks = [
 ]
 
 
-data = {
+# 更新股票列表
+with open(
+    "public/data/stocks.json",
+    "w",
+    encoding="utf-8"
+) as f:
+    json.dump(
+        {
+            "stocks": stocks
+        },
+        f,
+        ensure_ascii=False,
+        indent=2
+    )
+
+
+# 更新行情
+quotes = {
     "date": datetime.now().strftime("%Y-%m-%d"),
     "quotes": [
         {
@@ -39,11 +56,11 @@ with open(
     encoding="utf-8"
 ) as f:
     json.dump(
-        data,
+        quotes,
         f,
         ensure_ascii=False,
         indent=2
     )
 
 
-print("update success")
+print("data update success")
