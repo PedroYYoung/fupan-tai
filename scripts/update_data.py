@@ -1,12 +1,7 @@
 import json
-import requests
 from datetime import datetime
-def get_price(code):
-    url = f"https://qt.gtimg.cn/q=sh{code}"
-    r = requests.get(url)
-    data = r.text
+import akshare as ak
 
-    return data
 
 stocks = [
     {
@@ -20,22 +15,43 @@ stocks = [
 ]
 
 
+df = ak.stock_zh_a_spot_em()
+
+
 quotes = []
 
+
 for stock in stocks:
-    quotes.append({
-        "code": stock["code"],
-        "name": stock["name"],
-        "price": get_price(stock["code"])
-    })
+
+    row = df[df["代码"] == stock["code"]]
+
+    if not row.empty:
+
+        quotes.append(
+            {
+                "code": stock["code"],
+                "name": stock["name"],
+                "price": float(row.iloc[0]["最新价"]),
+                "change": float(row.iloc[0]["涨跌幅"])
+            }
+        )
 
 
 data = {
     "date": datetime.now().strftime("%Y-%m-%d"),
     "quotes": quotes
 }
-}
 
 
-with open("public/data/quotes.json", "w", encoding="utf-8") as f:
-    json.dump(data, f, ensure_ascii=False, indent=2)
+with open(
+    "public/data/quotes.json",
+    "w",
+    encoding="utf-8"
+) as f:
+
+    json.dump(
+        data,
+        f,
+        ensure_ascii=False,
+        indent=2
+    )
