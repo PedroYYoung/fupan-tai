@@ -13,32 +13,38 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
+
     steps:
 
-    - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
 
-    - name: Install Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
 
-    - name: Install packages
-      run: |
-        pip install akshare
+      - name: Install packages
+        run: |
+          pip install akshare
 
 
-    - name: Update data
-      run: |
-        python scripts/update_data.py
+      - name: Update data
+        run: |
+          python scripts/update_data.py
 
 
-    - name: Commit
-      run: |
-        git config --global user.name "bot"
-        git config --global user.email "bot@example.com"
+      - name: Commit changes
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
 
-        git add .
-        git commit -m "update market data" || exit 0
-        git push
+          git add .
+
+          git commit -m "update market data" || exit 0
+
+          git push
