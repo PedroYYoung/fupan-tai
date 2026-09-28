@@ -8,3 +8,4 @@ __pycache__
 public/data/meta/last_error.log
 .DS_Store
 .vercel
+vite.config.ts.timestamp-*.mjs
