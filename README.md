@@ -51,15 +51,22 @@ public/data/
 - **情绪**：涨停百分位 >90 且跌停百分位 <10 → 赚钱效应强；跌停 >50 家且 10亿以上跌停 ≥5 → 高位股杀跌提示
 - 每条结论附「依据：X=xx，百分位xx%」，总分 = 资金(≤38)+结构(≤28)+情绪(≤28)，映射 0-100
 
-## 序列层回补（第二批，仅本地）
+## 序列层回补（本地 / 云端）
 
 ```bash
-python scripts/build.py --incremental --backfill-days 250   # 回补最近 250 个交易日的序列
+# 方式一：本地回补（走 AKShare 东财源；若本地网络对东财受限，用方式二）
+python scripts/build.py --incremental --backfill-days 250
+
+# 方式二：云端回补（GitHub Actions 手动触发，无网络限制）
+#   Actions → update-data → Run workflow → backfill_days 填天数
 ```
 
 - **可回补**：两市成交额（上证+深成指日线代理口径）、两融余额、涨跌停池、各指数/宽基成交额
-- **不可回补**（依赖当日全市场快照，东财仅实时可得，自启用日起每日累积）：10亿以上家数、市值分档、前10集中度
-- 回补内置限速（每 50 次请求歇 2s、失败重试 2 次），350 天回补约 15-25 分钟
+- **本地受限时的备源通道**（`scripts/backfill_real.py`，东财被封时一次性建仓）：
+  交易日历→新浪；指数/全市场逐股日线→baostock（免注册，同时回补涨跌停/10亿以上家数/前10集中度序列）；
+  两融余额→iFinD 数据通道；当日快照/总市值→腾讯批量行情；行业→同花顺板块
+- **不可回补**（依赖当日全市场快照，仅实时可得，自启用日起每日累积）：市值分档、微盘代理历史序列
+- 回补内置限速（每 50 次请求歇 2s、失败重试 2 次）；`backfill.py` 已改为批量合并写入（无逐点 O(n³) 重算）
 
 ## 已交付页面
 
@@ -83,7 +90,7 @@ python scripts/build.py --incremental --backfill-days 250   # 回补最近 250 �
 - `scripts/build.py --date YYYYMMDD`：单日快照模式（第一批）
 - `scripts/build.py --incremental`：增量模式（CI/任务计划用）
 - `--backfill-days N`：本地历史回补（勿在 CI 使用）
-- 模块：`calendar_mod` 交易日 / `spot_mod` 全市场快照（东财主源 + efinance 备源）/ `margin_mod` 两融 / `zt_mod` 涨跌停（含快照兜底判定）/ `index_mod` 指数成交额（恒生科技用 513180 近似）/ `compute` 排名·百分位·市值分档·微盘代理·集中度 / `notify` 失败推送
+- 模块：`calendar_mod` 交易日 / `spot_mod` 全市场快照（东财主源 + efinance 备源 + 腾讯批量兜底，三通道全失败抛 `SpotFetchError` 保留旧数据）/ `margin_mod` 两融 / `zt_mod` 涨跌停（含快照兜底判定）/ `index_mod` 指数成交额（恒生科技用 513180 近似）/ `compute` 排名·百分位·市值分档·微盘代理·集中度 / `notify` 失败推送
 - 硬规则：单接口重试≤2 次间隔 5s；每 50 次请求 sleep 2s；`*.tmp` 原子替换；任一日失败保留旧数据 + `last_error.log` + `exit 0`
 
 ## 第一批验收清单（逐条可测）

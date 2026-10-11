@@ -2,4 +2,5 @@ akshare>=1.14.0
 pandas>=2.0.0
 requests>=2.31.0
 efinance>=0.5.2
+baostock>=0.8.9
 python-dotenv>=1.0.0

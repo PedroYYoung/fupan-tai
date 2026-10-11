@@ -7,6 +7,11 @@ on:
     # UTC 11:30 = 北京时间 19:30（收盘后）：全量增量数据 + 自选股行情兜底
     - cron: '30 11 * * *'
   workflow_dispatch:
+    inputs:
+      backfill_days:
+        description: '云端序列回补天数（0=只跑增量；>0 回补最近 N 个交易日，本地受限时的云端通道）'
+        required: false
+        default: '0'
 
 concurrency:
   group: update-data
@@ -15,7 +20,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     permissions:
       contents: write
     steps:
@@ -29,13 +34,25 @@ jobs:
       - name: Install deps
         run: pip install -r scripts/requirements.txt
 
+      # 回归测试：行情接口失败路径不得再触发未定义函数错误（如 notify_failure NameError）
+      - name: Run tests
+        run: |
+          pip install pytest
+          python -m pytest tests/ -q
+
       # 全市场数据管线：单日失败自动保留旧数据并 exit 0，不会中断后续步骤
       - name: Build data (incremental)
         env:
           TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
           PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
           SC_SENDKEY: ${{ secrets.SC_SENDKEY }}
-        run: python scripts/build.py --incremental
+        run: |
+          BF="${{ github.event.inputs.backfill_days }}"
+          if [ -n "$BF" ] && [ "$BF" != "0" ]; then
+            echo "云端序列回补：最近 $BF 个交易日"
+            python scripts/build.py --incremental --backfill-days "$BF" || true
+          fi
+          python scripts/build.py --incremental
 
       # 自选股行情（quotes.json）：读取 public/data/stocks.json 清单
       - name: Update quotes

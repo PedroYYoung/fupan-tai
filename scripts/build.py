@@ -42,7 +42,7 @@ def last_closed_trade_date(dates: list) -> str:
 def build_one(date: str, dates: list, backfill_days: int = 0):
     """构建单日快照并维护序列；任何异常向上抛出"""
     log(f"===== 构建交易日 {date} =====")
-    spot_df = spot_mod.get_spot()
+    spot_df = spot_mod.get_spot(date)
 
     # ---- 指数/宽基成交额（含当日 + 回补窗口）----
     def fetch_index_rows(d: str):
@@ -285,7 +285,7 @@ def main():
         except Exception as e:  # noqa: BLE001
             failed += 1
             record_error(f"日期 {d} 构建失败: {e}")
-            notify_failure("复盘台数据更新失败", f"日期 {d} 构建失败: {e}")
+            notify.notify_failure("复盘台数据更新失败", f"日期 {d} 构建失败: {e}")
             log(f"日期 {d} 构建失败（已保留旧数据）：{e}")
             if failed >= 2:
                 log("连续失败 2 次，终止本次构建")
@@ -296,12 +296,19 @@ def main():
         log(f"{failed} 个日期失败，详情见 data/meta/last_error.log")
 
 
-if __name__ == "__main__":
+def run() -> int:
+    """进程入口（__main__ 与测试共用）。
+
+    FATAL 也遵守同一套容错约定：保留旧数据、记录 last_error.log、
+    推送失败通知（notify.notify_failure）、返回 0（网站仍显示上一交易日数据）。"""
     try:
         main()
     except Exception as e:  # noqa: BLE001
-        # 任一日失败：保留旧数据、记录错误、exit 0（网站仍显示上一交易日数据）
         record_error(f"FATAL: {e}\n{traceback.format_exc()}")
-        notify_failure("复盘台数据更新失败（FATAL）", str(e))
+        notify.notify_failure("复盘台数据更新失败（FATAL）", str(e))
         log(f"构建失败（已保留旧数据）：{e}")
-        sys.exit(0)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(run())
