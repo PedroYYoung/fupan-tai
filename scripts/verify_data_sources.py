@@ -21,7 +21,23 @@ except Exception as e:
     print("IMPORT ERROR:", e)
     traceback.print_exc()
 
-TARGET = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y%m%d")
+def _infer_target_date() -> str:
+    """以腾讯上证指数返回的行情日期作为目标交易日（避免非交易日用昨天）。"""
+    try:
+        r = requests.get("https://qt.gtimg.cn/q=sh000001",
+                         headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+        r.encoding = "gbk"
+        for line in r.text.strip().split(";"):
+            if 'v_sh000001="' in line:
+                f = line.split('"')[1].split("~")
+                if len(f) > 30 and f[30] and len(f[30]) >= 8:
+                    return f[30][:8]
+    except Exception as e:  # noqa: BLE001
+        print(f"推断目标日期失败({e})，回退到昨天", file=sys.stderr)
+    return (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y%m%d")
+
+
+TARGET = _infer_target_date()
 DATE_HYPHEN = f"{TARGET[:4]}-{TARGET[4:6]}-{TARGET[6:]}"
 RESULTS = []
 
