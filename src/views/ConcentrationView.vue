@@ -4,6 +4,8 @@ import { useDataStore } from '../stores/data'
 import type { SeriesPoint, StockRow } from '../types'
 import ChartPanel from '../components/ChartPanel.vue'
 import { miniLineOption } from '../lib/echarts'
+import type { EChartsOption } from 'echarts'
+import { MUTED, TEXT, BORDER } from '../lib/echarts'
 
 const store = useDataStore()
 const concSeries = ref<SeriesPoint[]>([])
@@ -30,13 +32,69 @@ function fmt(n: number | null | undefined, digits = 2): string {
   return n.toLocaleString('zh-CN', { maximumFractionDigits: digits, minimumFractionDigits: digits })
 }
 
-function rows(k: number): StockRow[] {
-  return (k === 10 ? conc.value?.top10 : k === 20 ? conc.value?.top20 : conc.value?.top50) ?? []
+const top50 = computed<StockRow[]>(() => conc.value?.top50 ?? [])
+
+// 三个辅助指标：Top10 / Top20 / Top50 成交占比
+const share10 = computed(() => top50.value.slice(0, 10).reduce((s, x) => s + (x.pct_of_total ?? 0), 0))
+const share20 = computed(() => top50.value.slice(0, 20).reduce((s, x) => s + (x.pct_of_total ?? 0), 0))
+const share50 = computed(() => top50.value.slice(0, 50).reduce((s, x) => s + (x.pct_of_total ?? 0), 0))
+
+// 资金重要程度颜色分层
+function rankColor(rank: number): string {
+  if (rank <= 10) return '#C0392B' // 核心资金区：暖红色系
+  if (rank <= 20) return '#E67E22' // 次核心资金区：橙色系
+  return '#5D6D7E' // 普通活跃区：灰蓝色系
 }
-function cum(list: StockRow[]): number[] {
-  let s = 0
-  return list.map((x) => (s = +(s + (x.pct_of_total ?? 0)).toFixed(2)))
-}
+
+const top50Opt = computed<EChartsOption>(() => {
+  const rows = top50.value
+  const data = rows.map((r, i) => ({
+    value: r.amount,
+    itemStyle: { color: rankColor(i + 1) },
+    code: r.code,
+    name: r.name,
+    rank: i + 1,
+    pct: r.pct_of_total ?? 0
+  }))
+  return {
+    animation: false,
+    grid: { left: 8, right: 8, top: 28, bottom: 28, containLabel: true },
+    tooltip: {
+      trigger: 'axis',
+      confine: true,
+      backgroundColor: '#131820',
+      borderColor: BORDER,
+      textStyle: { color: TEXT, fontSize: 12 },
+      axisPointer: { type: 'shadow' as const },
+      formatter: (params: unknown) => {
+        const p = (params as { data: typeof data[0] }[])[0]?.data
+        if (!p) return ''
+        return `<b>#${p.rank} ${p.name}</b>（${p.code}）<br/>成交额：${p.value.toFixed(2)} 亿<br/>占市场：${p.pct.toFixed(2)}%`
+      }
+    },
+    xAxis: {
+      type: 'category',
+      data: rows.map((_, i) => String(i + 1)),
+      axisLine: { lineStyle: { color: BORDER } },
+      axisTick: { show: false },
+      axisLabel: { color: MUTED, fontSize: 10, interval: 4 }
+    },
+    yAxis: {
+      type: 'value',
+      scale: true,
+      name: '成交额（亿）',
+      nameTextStyle: { color: MUTED, fontSize: 11, padding: [0, 0, 0, 40] },
+      splitLine: { lineStyle: { color: BORDER, type: 'dashed' } },
+      axisLabel: { color: MUTED, fontSize: 10 }
+    },
+    series: [{
+      type: 'bar' as const,
+      data,
+      barWidth: '60%',
+      label: { show: false }
+    }]
+  }
+})
 
 const concOpt = computed(() =>
   miniLineOption(
@@ -52,53 +110,38 @@ const concOpt = computed(() =>
 <template>
   <div class="page">
     <h1 class="page-title">🎯 个股集中度 · <span class="num">{{ daily ? store.formatDay(daily.trade_date) : '—' }}</span></h1>
-    <p class="page-desc">按成交额排序的头部个股结构 · 抱团度 = 前10成交占比在历史中的百分位</p>
+    <p class="page-desc">资金结构视角：前50名成交排名 + 分层占比 · 判断龙头集中 / 资金扩散 / 普遍活跃</p>
 
     <template v-if="conc && daily">
+      <!-- 三个辅助指标 -->
       <div class="card-grid cols-3">
         <div class="card">
-          <div class="card-title">🎯 前10合计占比</div>
-          <div class="card-value num">{{ fmt(conc.top10.reduce((s, x) => s + (x.pct_of_total ?? 0), 0)) }}<span class="unit">%</span></div>
-          <div class="card-sub num">
-            {{ nAll >= 30 && conc.top10_total_pctile_hist != null ? `历史 ${conc.top10_total_pctile_hist}%` : '样本不足' }}
-          </div>
-          <span class="card-sample num">样本N={{ nAll }}</span>
+          <div class="card-title">🔴 核心资金区 Top10</div>
+          <div class="card-value num">{{ fmt(share10) }}<span class="unit">%</span></div>
+          <div class="card-sub num">市场最核心成交资金</div>
+          <span class="card-sample num">占全市场成交</span>
         </div>
         <div class="card">
-          <div class="card-title">🎯 前20合计占比</div>
-          <div class="card-value num">{{ fmt(conc.top20_cum_pct) }}<span class="unit">%</span></div>
-          <div class="card-sub num">较前10 +{{ fmt(conc.top20_cum_pct - conc.top10.reduce((s, x) => s + (x.pct_of_total ?? 0), 0)) }}pct</div>
+          <div class="card-title">🟠 次核心资金区 Top20</div>
+          <div class="card-value num">{{ fmt(share20) }}<span class="unit">%</span></div>
+          <div class="card-sub num">较前10 +{{ fmt(share20 - share10) }}pct</div>
+          <span class="card-sample num">含前10累计</span>
         </div>
         <div class="card">
-          <div class="card-title">🎯 前50合计占比</div>
-          <div class="card-value num">{{ fmt(conc.top50_cum_pct) }}<span class="unit">%</span></div>
-          <div class="card-sub num">较前20 +{{ fmt(conc.top50_cum_pct - conc.top20_cum_pct) }}pct</div>
+          <div class="card-title">🔵 普通活跃区 Top50</div>
+          <div class="card-value num">{{ fmt(share50) }}<span class="unit">%</span></div>
+          <div class="card-sub num">较前20 +{{ fmt(share50 - share20) }}pct</div>
+          <span class="card-sample num">含前20累计</span>
         </div>
       </div>
 
-      <div class="card-grid cols-3" style="margin-top:14px">
-        <div v-for="k in ([10, 20, 50] as const)" :key="k" class="card">
-          <div class="card-title">📋 前{{ k }}明细</div>
-          <div class="table-wrap" style="margin-top:8px">
-            <table class="data">
-              <thead>
-                <tr><th>代码</th><th>名称</th><th>成交额(亿)</th><th>占比</th><th>累计</th></tr>
-              </thead>
-              <tbody>
-                <tr v-for="(s, i) in rows(k)" :key="s.code">
-                  <td class="num">{{ s.code }}</td>
-                  <td>{{ s.name }}</td>
-                  <td class="num">{{ fmt(s.amount, 1) }}</td>
-                  <td class="num">{{ fmt(s.pct_of_total) }}%</td>
-                  <td class="num muted">{{ cum(rows(k))[i] }}%</td>
-                </tr>
-                <tr v-if="!rows(k).length"><td colspan="5" class="muted">无</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+      <!-- Top50 成交排名柱状图 -->
+      <div class="card" style="margin-top:14px">
+        <div class="card-title">📊 Top50 成交排名（按成交额降序 · 1-10核心/11-20次核心/21-50普通）</div>
+        <ChartPanel :option="top50Opt" height="320px" />
       </div>
 
+      <!-- 头部抱团度历史折线 -->
       <div class="card" style="margin-top:14px">
         <div class="card-title">🧲 头部抱团度（前10成交占比 %，近120个交易日）</div>
         <ChartPanel v-if="ready && nAll >= 30" :option="concOpt" height="240px" />
