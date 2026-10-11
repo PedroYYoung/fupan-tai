@@ -31,6 +31,10 @@ jobs:
       - name: Verify independent data sources
         run: python scripts/verify_data_sources.py
 
+      - name: Print verify report
+        if: always()
+        run: cat scripts/_cache/verify_data_sources_report.json || true
+
       - name: Upload verify report
         uses: actions/upload-artifact@v4
         if: always()
