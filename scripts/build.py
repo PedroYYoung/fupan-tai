@@ -39,6 +39,28 @@ def last_closed_trade_date(dates: list) -> str:
     return past[-1]
 
 
+def _previous_trade_day(date: str, dates: list) -> str | None:
+    """返回 date 在交易日历中的上一个交易日。"""
+    if date not in dates:
+        return None
+    i = dates.index(date)
+    return dates[i - 1] if i > 0 else None
+
+
+def _load_industry_from_daily(date: str):
+    """从指定日期的 daily 文件中读取 industry 字段。"""
+    import json
+    p = os.path.join(DATA_DIR, "daily", f"{date}.json")
+    if not os.path.exists(p):
+        return None
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            d = json.load(f)
+        return d.get("industry")
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def build_one(date: str, dates: list, backfill_days: int = 0):
     """构建单日快照并维护序列；任何异常向上抛出"""
     log(f"===== 构建交易日 {date} =====")
@@ -81,6 +103,15 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
 
     # ---- 行业板块（东财行业当日涨跌TOP10）----
     industry = industry_mod.get_industry_daily(total_amount)
+    if industry is None:
+        # 东财行业失败：尝试继承上一交易日数据（保证页面不空），并记录原因
+        prev = _previous_trade_day(date, dates)
+        if prev:
+            industry = _load_industry_from_daily(prev)
+            if industry:
+                log(f"行业板块继承自上一交易日 {prev}")
+        if industry is None:
+            log(f"行业板块 {date} 获取失败且无前值可继承，置为空")
 
     overview = {
         "total_amount": total_amount,

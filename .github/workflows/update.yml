@@ -18,6 +18,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  verify-sources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install deps
+        run: pip install -r scripts/requirements.txt
+      - name: Verify independent data sources
+        run: python scripts/verify_data_sources.py
+      - name: Upload verify report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verify-data-sources-report
+          path: scripts/_cache/verify_data_sources_report.json
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
