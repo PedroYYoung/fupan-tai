@@ -3,6 +3,7 @@
 import datetime
 import io
 import json
+import os
 import sys
 import traceback
 
@@ -260,4 +261,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:  # noqa: BLE001
+        sys.stdout = OLD_STDOUT
+        sys.stderr = OLD_STDERR
+        print(f"FATAL: {e}")
+        traceback.print_exc()
+        raise
