@@ -132,27 +132,33 @@ def over_10e(spot_df):
 
 def update_series(key: str, name: str, unit: str, date: str, value):
     """读取 data/series/{key}.json，upsert 当日点，重算 rank_year/rank_1y/rank_all/pctile"""
+    return write_series_merge(key, name, unit, {date: value})
+
+
+def write_series_merge(key: str, name: str, unit: str, values: dict):
+    """批量合并：已有序列点 + 新值（新值优先），一次性整体重算排名/百分位后原子写出。
+    适合回补场景（避免逐点 update 的 O(n^3) 重算）。"""
     import json, os
     from .common import DATA_DIR, atomic_write_json, now_iso
     path = os.path.join(DATA_DIR, "series", f"{key}.json")
-    points = []
+    merged = {}
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
-            points = json.load(f).get("points", [])
-    points = [p for p in points if p["date"] != date]
-    points.append({"date": date, "value": value})
-    points.sort(key=lambda p: p["date"])
-    values = [p["value"] for p in points]
+            for p in json.load(f).get("points", []):
+                if p.get("value") is not None:
+                    merged[p["date"]] = p["value"]
+    merged.update({d: v for d, v in values.items() if v is not None})
+    points = [{"date": d, "value": v} for d, v in sorted(merged.items())]
+    vals = [p["value"] for p in points]
     dates = [p["date"] for p in points]
-    year = date[:4]
     for i, p in enumerate(points):
         v = p["value"]
-        p["rank_all"] = rank_of(values, v)
-        p["pctile"] = pctile(values, v)
-        year_vals = [q["value"] for q, d in zip(points, dates) if d.startswith(year)]
+        p["rank_all"] = rank_of(vals, v)
+        p["pctile"] = pctile(vals, v)
+        year_vals = [q["value"] for q, d in zip(points, dates) if d.startswith(p["date"][:4])]
         p["rank_year"] = rank_of(year_vals, v) if year_vals else None
         lo = max(0, i - 243)
-        p["rank_1y"] = rank_of(values[lo:i + 1], v)
+        p["rank_1y"] = rank_of(vals[lo:i + 1], v)
     atomic_write_json(path, {"key": key, "name": name, "unit": unit,
                              "updated_at": now_iso(), "points": points})
-    log(f"序列 {key} 共 {len(points)} 点")
+    log(f"序列 {key} 共 {len(points)} 点（本次合并 {len(values)} 个新值）")

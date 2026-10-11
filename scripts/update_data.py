@@ -36,34 +36,70 @@ def load_watchlist() -> list:
 
 
 def fetch_quotes(watchlist: list) -> list:
-    """按清单从全市场快照提取最新价/涨跌幅；接口失败返回 None（保留旧数据）"""
+    """按清单取最新价/涨跌幅：东财快照（主）→ 腾讯批量（备）；均失败返回 None（保留旧数据）"""
+    quotes = None
+    # 主源：AKShare 东财全市场快照
     try:
         import akshare as ak
-    except ImportError:
-        log("未安装 akshare：pip install -r scripts/requirements.txt")
-        return None
-    try:
         df = ak.stock_zh_a_spot_em()
-    except Exception as e:
-        log(f"AkShare 快照接口失败: {e}")
-        return None
-
-    quotes = []
-    for stock in watchlist:
-        row = df[df["代码"] == stock["code"]]
-        if row.empty:
-            # 退市/停牌/代码错误：保留条目、值为 null（契约：null 表示缺失而非 0）
+        quotes = []
+        for stock in watchlist:
+            row = df[df["代码"] == stock["code"]]
+            if row.empty:
+                # 退市/停牌/代码错误：保留条目、值为 null（契约：null 表示缺失而非 0）
+                quotes.append({"code": stock["code"], "name": stock["name"],
+                               "price": None, "change": None})
+                continue
+            r = row.iloc[0]
+            try:
+                price = float(r["最新价"])
+                change = float(r["涨跌幅"])
+            except (TypeError, ValueError):
+                price, change = None, None
             quotes.append({"code": stock["code"], "name": stock["name"],
-                           "price": None, "change": None})
-            continue
-        r = row.iloc[0]
+                           "price": price, "change": change})
+    except Exception as e:  # noqa: BLE001
+        log(f"AKShare 快照接口失败（尝试腾讯备源）：{e}")
+
+    # 备源：腾讯批量行情（本地网络对东财受限时的稳定通道）
+    if quotes is None:
         try:
-            price = float(r["最新价"])
-            change = float(r["涨跌幅"])
-        except (TypeError, ValueError):
-            price, change = None, None
-        quotes.append({"code": stock["code"], "name": stock["name"],
-                       "price": price, "change": change})
+            import requests
+            codes = []
+            for w in watchlist:
+                pre = "sh" if w["code"].startswith("6") else (
+                    "sz" if w["code"].startswith(("0", "3")) else "bj")
+                codes.append(pre + w["code"])
+            s = requests.Session()
+            s.trust_env = False
+            r = s.get(f"https://qt.gtimg.cn/q={','.join(codes)}",
+                      headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+            r.encoding = "gbk"
+            by_code = {}
+            for line in r.text.strip().split(";"):
+                if "=" not in line:
+                    continue
+                f = line.split("=", 1)[1].strip('"').split("~")
+                if len(f) > 33 and f[2]:
+                    by_code[f[2]] = (f[1], f[3], f[32])
+            quotes = []
+            for w in watchlist:
+                t = by_code.get(w["code"])
+                if t:
+                    try:
+                        quotes.append({"code": w["code"], "name": t[0],
+                                       "price": float(t[1]) if t[1] else None,
+                                       "change": float(t[2]) if t[2] else None})
+                    except ValueError:
+                        quotes.append({"code": w["code"], "name": t[0],
+                                       "price": None, "change": None})
+                else:
+                    quotes.append({"code": w["code"], "name": w["name"],
+                                   "price": None, "change": None})
+            log("已使用腾讯备源获取自选股行情")
+        except Exception as e:  # noqa: BLE001
+            log(f"腾讯备源也失败：{e}")
+            return None
     return quotes
 
 
