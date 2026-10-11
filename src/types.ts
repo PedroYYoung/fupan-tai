@@ -146,6 +146,7 @@ export interface DailyData {
     over_10e_ratio: number
     pctile_count: number | null
     mktcap_buckets: Bucket[]
+    amount_buckets?: Bucket[]
   }
   emotion: Emotion
   sparklines?: Sparklines

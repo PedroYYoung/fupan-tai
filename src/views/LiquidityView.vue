@@ -42,6 +42,63 @@ function fmt(n: number | null | undefined, digits = 1): string {
   return n.toLocaleString('zh-CN', { maximumFractionDigits: digits, minimumFractionDigits: digits })
 }
 
+// 成交额分档颜色：高成交暖色 → 低成交冷色
+const AMOUNT_COLORS: Record<string, string> = {
+  '100亿+': '#C0392B',
+  '50-100亿': '#E74C3C',
+  '20-50亿': '#E67E22',
+  '10-20亿': '#F39C12',
+  '5-10亿': '#F1C40F',
+  '1-5亿': '#95A5A6',
+  '<1亿': '#5D6D7E'
+}
+
+const amountBuckets = computed(() => liq.value?.amount_buckets ?? [])
+
+const amountDistOpt = computed<EChartsOption | null>(() => {
+  const buckets = amountBuckets.value
+  if (!buckets.length) return null
+  return {
+    animation: false,
+    grid: { left: 8, right: 8, top: 24, bottom: 4, containLabel: true },
+    tooltip: {
+      trigger: 'axis',
+      confine: true,
+      backgroundColor: '#131820',
+      borderColor: BORDER,
+      textStyle: { color: TEXT, fontSize: 12 },
+      formatter: (params: unknown) => {
+        const arr = params as { name: string; value: number; dataIndex: number }[]
+        const idx = arr[0]?.dataIndex ?? 0
+        const b = buckets[idx]
+        if (!b) return ''
+        return `<b>${b.label}</b><br/>股票数：${b.count} 只<br/>占全市场：${b.pct}%`
+      }
+    },
+    xAxis: {
+      type: 'category',
+      data: buckets.map((b) => b.label),
+      axisLine: { lineStyle: { color: BORDER } },
+      axisTick: { show: false },
+      axisLabel: { color: MUTED, fontSize: 10, interval: 0 }
+    },
+    yAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { color: BORDER, type: 'dashed' } },
+      axisLabel: { color: MUTED, fontSize: 10 }
+    },
+    series: [{
+      type: 'bar',
+      data: buckets.map((b) => ({
+        value: b.count,
+        itemStyle: { color: AMOUNT_COLORS[b.label] || MUTED, borderRadius: [4, 4, 0, 0] },
+        label: { show: true, position: 'top', color: TEXT, fontSize: 10, formatter: `${b.count}` }
+      })),
+      barMaxWidth: 28
+    }]
+  }
+})
+
 const o10Opt = computed<EChartsOption>(() => ({
   animation: false,
   grid: { left: 8, right: 8, top: 12, bottom: 4, containLabel: true },
@@ -107,7 +164,7 @@ const stackOpt = computed<EChartsOption | null>(() => {
 <template>
   <div class="page">
     <h1 class="page-title">📐 流动性结构 · <span class="num">{{ daily ? store.formatDay(daily.trade_date) : '—' }}</span></h1>
-    <p class="page-desc">10亿以上活跃家数 + 市值 6 档结构（堆叠面积，占比%）</p>
+    <p class="page-desc">10亿以上活跃家数 + 成交额分档结构 + 市值 6 档结构</p>
 
     <template v-if="liq && daily">
       <div class="card-grid cols-4">
@@ -133,6 +190,12 @@ const stackOpt = computed<EChartsOption | null>(() => {
       </div>
 
       <div class="card" style="margin-top:14px">
+        <div class="card-title">🔥 成交额分档结构（当日单票成交额）</div>
+        <ChartPanel v-if="amountDistOpt" :option="amountDistOpt" height="260px" />
+        <div v-else class="empty-box">🟡 暂无成交额分档数据</div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
         <div class="card-title">🧱 市值 6 档堆叠面积（占比%，hover 看家数）</div>
         <ChartPanel v-if="stackOpt" :option="stackOpt" height="280px" />
         <div v-else class="empty-box">🟡 市值分档序列尚未累积（自启用日起每日累积，无法历史回补）</div>
@@ -145,6 +208,19 @@ const stackOpt = computed<EChartsOption | null>(() => {
           </thead>
           <tbody>
             <tr v-for="b in liq.mktcap_buckets" :key="b.label">
+              <td>{{ b.label }}</td><td class="num">{{ b.count }}</td><td class="num">{{ b.pct }}%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-wrap" style="margin-top:10px" v-if="liq.amount_buckets?.length">
+        <table class="data">
+          <thead>
+            <tr><th>成交额档位</th><th>家数</th><th>占比</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="b in liq.amount_buckets" :key="b.label">
               <td>{{ b.label }}</td><td class="num">{{ b.count }}</td><td class="num">{{ b.pct }}%</td>
             </tr>
           </tbody>

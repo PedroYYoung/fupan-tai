@@ -195,6 +195,7 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
             "over_10e_count": over_cnt, "over_10e_ratio": over_ratio,
             "pctile_count": compute.pctile(series_values("over_10e_count"), over_cnt),
             "mktcap_buckets": compute.mktcap_buckets(spot_df),
+            "amount_buckets": compute.amount_buckets(spot_df),
         },
         "emotion": {
             "limit_up": limit_up, "limit_down": limit_down,

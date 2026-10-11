@@ -551,21 +551,37 @@ def stage_snapshot():
         "top10_total_pctile_hist": tc_pts.get(target, {}).get("pctile") if top10 else None,
     }
 
-    # ---- 流动性（市值分档，腾讯总市值）----
+    # ---- 流动性（成交额分档 + 市值分档，腾讯总市值）----
     all_caps = [v["mktcap_yi"] for v in tx_map.values() if v["mktcap_yi"]]
-    buckets = []
+    mktcap_bkts = []
     if all_caps:
-        n = len(all_caps)
-        edges = [("<50亿", 0, 50), ("50-100亿", 50, 100), ("100-200亿", 100, 200),
-                 ("200-500亿", 200, 500), ("500-1000亿", 500, 1000), (">1000亿", 1000, 1e12)]
-        for label, lo, hi in edges:
+        n_cap = len(all_caps)
+        cap_edges = [("<50亿", 0, 50), ("50-100亿", 50, 100), ("100-200亿", 100, 200),
+                     ("200-500亿", 200, 500), ("500-1000亿", 500, 1000), (">1000亿", 1000, 1e12)]
+        for label, lo, hi in cap_edges:
             c = sum(1 for v in all_caps if lo <= v < hi)
-            buckets.append({"label": label, "count": c, "pct": round(c / n * 100, 1)})
+            mktcap_bkts.append({"label": label, "count": c, "pct": round(c / n_cap * 100, 1)})
+
+    amount_bkts = []
+    all_amounts = [v["amount_yi"] for v in tx_map.values() if v["amount_yi"] is not None]
+    if all_amounts:
+        n_amt = len(all_amounts)
+        amt_edges = [("100亿+", 1e10, float("inf")), ("50-100亿", 5e9, 1e10),
+                     ("20-50亿", 2e9, 5e9), ("10-20亿", 1e9, 2e9),
+                     ("5-10亿", 5e8, 1e9), ("1-5亿", 1e8, 5e8), ("<1亿", 0, 1e8)]
+        for label, lo, hi in amt_edges:
+            if hi == float("inf"):
+                c = sum(1 for v in all_amounts if v >= lo)
+            else:
+                c = sum(1 for v in all_amounts if lo <= v < hi)
+            amount_bkts.append({"label": label, "count": c, "pct": round(c / n_amt * 100, 1)})
+
     o10_pts = {p["date"]: p for p in read_series_points("over_10e_count")}
     liquidity = {"over_10e_count": over_cnt,
                  "over_10e_ratio": overview["over_10e_ratio"],
                  "pctile_count": o10_pts.get(target, {}).get("pctile"),
-                 "mktcap_buckets": buckets}
+                 "mktcap_buckets": mktcap_bkts,
+                 "amount_buckets": amount_bkts}
 
     # ---- 情绪 ----
     lu_pts = {p["date"]: p for p in read_series_points("limit_up_down")}

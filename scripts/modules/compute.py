@@ -12,6 +12,16 @@ from .common import log
 
 MKTCAP_BUCKETS = ["<50亿", "50-100亿", "100-200亿", "200-500亿", "500-1000亿", ">1000亿"]
 
+AMOUNT_BUCKETS = [
+    ("100亿+", 1e10, float("inf")),
+    ("50-100亿", 5e9, 1e10),
+    ("20-50亿", 2e9, 5e9),
+    ("10-20亿", 1e9, 2e9),
+    ("5-10亿", 5e8, 1e9),
+    ("1-5亿", 1e8, 5e8),
+    ("<1亿", 0, 1e8),
+]
+
 
 def rank_of(series: list, value: float) -> int:
     """降序排位（1=最大），并列者日期新者居前由调用方保证序列按日期升序"""
@@ -39,6 +49,19 @@ def mktcap_buckets(spot_df):
     counts.append(int((caps >= 1000).sum()))
     rows = []
     for label, c in zip(MKTCAP_BUCKETS, counts):
+        rows.append({"label": label, "count": c, "pct": round(c / n * 100, 1) if n else 0})
+    return rows
+
+
+def amount_buckets(spot_df):
+    """成交额 7 档：100亿+/50-100/20-50/10-20/5-10/1-5/<1亿（基于 spot_df['amount'] 元）"""
+    if "amount" not in spot_df.columns:
+        return [{"label": label, "count": 0, "pct": 0} for label, _lo, _hi in AMOUNT_BUCKETS]
+    amounts = spot_df["amount"].dropna()
+    n = len(amounts)
+    rows = []
+    for label, lo, hi in AMOUNT_BUCKETS:
+        c = int(((amounts >= lo) & (amounts < hi)).sum()) if hi != float("inf") else int((amounts >= lo).sum())
         rows.append({"label": label, "count": c, "pct": round(c / n * 100, 1) if n else 0})
     return rows
 
