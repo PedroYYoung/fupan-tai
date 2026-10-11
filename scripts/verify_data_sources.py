@@ -43,6 +43,7 @@ RESULTS = []
 
 
 def flush_log():
+    os.makedirs("scripts/_cache", exist_ok=True)
     with open("scripts/_cache/verify_data_sources.log", "w", encoding="utf-8") as f:
         f.write(LOG_BUF.getvalue())
 
