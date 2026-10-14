@@ -7,6 +7,7 @@
   需用户提供「东财行业 ↔ 申万二级」CSV 对齐表后启用 backfill_industry()
 """
 import akshare as ak
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from .common import retry, log
 
 
@@ -58,3 +59,62 @@ def backfill_industry(mapping_csv: str, start: str, end: str):
         except Exception as e:  # noqa: BLE001
             log(f"申万 {code} 回填失败：{e}")
     log("行业历史回填完成")
+
+
+# ------------------------------------------------------------------
+# 行业周涨跌排名（基于东财行业指数日线，与当日行业同一数据源）
+# ------------------------------------------------------------------
+def _week_start(date: str, dates: list) -> str | None:
+    """返回当前交易周第一个交易日（周一或之后首个交易日）"""
+    import datetime
+    d = datetime.datetime.strptime(date, "%Y%m%d")
+    mon = d - datetime.timedelta(days=d.weekday())
+    start = mon.strftime("%Y%m%d")
+    candidates = [x for x in dates if start <= x <= date]
+    return candidates[0] if candidates else None
+
+
+def _industry_week_change(name: str, start: str, end: str):
+    """单个行业本周涨跌幅（%）；失败返回 None"""
+    try:
+        df = ak.stock_board_industry_hist_em(symbol=name, start_date=start, end_date=end,
+                                             period="日k", adjust="")
+        if df is None or len(df) < 1:
+            return None
+        first = float(df.iloc[0]["收盘"])
+        last = float(df.iloc[-1]["收盘"])
+        if first <= 0:
+            return None
+        return round((last / first - 1) * 100, 2)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def get_industry_week_rank(date: str, dates: list):
+    """返回 {top5: [{name, change}], bottom5: [...]}；失败返回 None"""
+    try:
+        start = _week_start(date, dates)
+        if not start:
+            log(f"行业周排名：无法确定 {date} 的本周起点")
+            return None
+        names_df = retry(lambda: ak.stock_board_industry_name_em(), what="东财行业名称列表")
+        names = names_df["板块名称"].astype(str).tolist()
+        results = []
+        with ThreadPoolExecutor(max_workers=5) as ex:
+            future_to_name = {ex.submit(_industry_week_change, name, start, date): name for name in names}
+            for fut in as_completed(future_to_name):
+                name = future_to_name[fut]
+                chg = fut.result()
+                if chg is not None:
+                    results.append({"name": name, "change": chg})
+        if not results:
+            return None
+        results.sort(key=lambda x: -x["change"])
+        top5 = results[:5]
+        bottom5 = results[-5:][::-1]
+        log(f"行业周排名：{len(results)} 个行业，TOP {top5[0]['name']} {top5[0]['change']}% / "
+            f"BOTTOM {bottom5[0]['name']} {bottom5[0]['change']}%")
+        return {"top5": top5, "bottom5": bottom5}
+    except Exception as e:  # noqa: BLE001
+        log(f"行业周排名获取失败：{e}")
+        return None

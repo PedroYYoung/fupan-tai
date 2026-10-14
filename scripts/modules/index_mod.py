@@ -9,6 +9,8 @@ import requests
 
 from .common import retry, log
 
+_BS_LOGGED = False
+
 # 行固定：5 指数 + 11 宽基（code: 指数代码）
 INDEX_CODES = {
     "sh000001": "上证指数", "sz399001": "深证成指", "sz399006": "创业板指",
@@ -119,3 +121,75 @@ def get_index_amount(code: str, date: str):
 
     # 通道 2：腾讯（独立通道，字段已实测验证）
     return _tencent_index_amount(code, date)
+
+
+# ------------------------------------------------------------------
+# baostock 指数收盘价（用于 YTD 等趋势观察，不新增数据源）
+# ------------------------------------------------------------------
+def _bs_code(code: str) -> str:
+    if code == "hstech_513180":
+        return "sh.513180"
+    if code.startswith("sh"):
+        return f"sh.{code[2:]}"
+    if code.startswith("sz"):
+        return f"sz.{code[2:]}"
+    if code.startswith("bj"):
+        return f"bj.{code[2:]}"
+    return code
+
+
+def _bs_date(d: str) -> str:
+    """YYYYMMDD → YYYY-MM-DD（baostock 要求）"""
+    return f"{d[:4]}-{d[4:6]}-{d[6:]}"
+
+
+def _bs_login():
+    global _BS_LOGGED
+    if not _BS_LOGGED:
+        import baostock as bs
+        _BS_LOGGED = bool(bs.login())
+
+
+def get_index_close(code: str, date: str):
+    """使用 baostock 获取指数/ETF 指定交易日收盘价；失败返回 None"""
+    _bs_login()
+    import baostock as bs
+    d = _bs_date(date)
+    rs = bs.query_history_k_data_plus(
+        _bs_code(code), "date,close", start_date=d, end_date=d,
+        frequency="d", adjustflag="3")
+    if rs is None or rs.error_code != "0":
+        msg = getattr(rs, "error_msg", "返回 None") if rs else "返回 None"
+        log(f"baostock 收盘价 {code} {date} 失败：{msg}")
+        return None
+    while rs.next():
+        row = rs.get_row_data()
+        try:
+            return float(row[1])
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def get_index_ytd_pct(code: str, date: str):
+    """计算指数/ETF 年初至今涨跌幅（%）；失败返回 None"""
+    year_start = _bs_date(f"{date[:4]}0101")
+    _bs_login()
+    import baostock as bs
+    rs = bs.query_history_k_data_plus(
+        _bs_code(code), "date,close", start_date=year_start, end_date=_bs_date(date),
+        frequency="d", adjustflag="3")
+    if rs is None or rs.error_code != "0":
+        msg = getattr(rs, "error_msg", "返回 None") if rs else "返回 None"
+        log(f"baostock YTD {code} {date} 失败：{msg}")
+        return None
+    rows = []
+    while rs.next():
+        rows.append(rs.get_row_data())
+    if len(rows) < 2:
+        return None
+    first_close = float(rows[0][1])
+    last_close = float(rows[-1][1])
+    if first_close <= 0:
+        return None
+    return round((last_close / first_close - 1) * 100, 2)

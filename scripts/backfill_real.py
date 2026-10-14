@@ -576,12 +576,36 @@ def stage_snapshot():
                 c = sum(1 for v in all_amounts if lo <= v < hi)
             amount_bkts.append({"label": label, "count": c, "pct": round(c / n_amt * 100, 1)})
 
+    # 成交额≥10亿股票的市值结构（基于腾讯总市值）
+    over10e = [(v["mktcap_yi"], v["amount_yi"]) for v in tx_map.values()
+               if v["mktcap_yi"] is not None and v["amount_yi"] is not None and v["amount_yi"] >= 10]
+    over10e_mcap_bkts = []
+    over10e_value_bkts = []
+    if over10e:
+        n_over = len(over10e)
+        total_cap = sum(m for m, _ in over10e)
+        mcap_edges = [("1000亿以上", 1000, float("inf")), ("500-1000亿", 500, 1000),
+                      ("200-500亿", 200, 500), ("100-200亿", 100, 200),
+                      ("50-100亿", 50, 100), ("50亿以下", 0, 50)]
+        for label, lo, hi in mcap_edges:
+            if hi == float("inf"):
+                bucket = [(m, a) for m, a in over10e if m >= lo]
+            else:
+                bucket = [(m, a) for m, a in over10e if lo <= m < hi]
+            c = len(bucket)
+            s = sum(m for m, _ in bucket)
+            over10e_mcap_bkts.append({"label": label, "count": c, "pct": round(c / n_over * 100, 1)})
+            over10e_value_bkts.append({"label": label, "count": c, "total_value": round(s, 2),
+                                       "pct": round(s / total_cap * 100, 1) if total_cap else 0})
+
     o10_pts = {p["date"]: p for p in read_series_points("over_10e_count")}
     liquidity = {"over_10e_count": over_cnt,
                  "over_10e_ratio": overview["over_10e_ratio"],
                  "pctile_count": o10_pts.get(target, {}).get("pctile"),
                  "mktcap_buckets": mktcap_bkts,
-                 "amount_buckets": amount_bkts}
+                 "amount_buckets": amount_bkts,
+                 "over_10e_marketcap_buckets": over10e_mcap_bkts,
+                 "over_10e_marketcap_value_buckets": over10e_value_bkts}
 
     # ---- 情绪 ----
     lu_pts = {p["date"]: p for p in read_series_points("limit_up_down")}

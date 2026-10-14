@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useDataStore } from '../stores/data'
-import type { BucketSeriesFile, SeriesPoint } from '../types'
+import type { Bucket, BucketSeriesFile, SeriesPoint, ValueBucket } from '../types'
 import ChartPanel from '../components/ChartPanel.vue'
 import type { EChartsOption } from 'echarts'
 import { MUTED, TEXT, BORDER } from '../lib/echarts'
@@ -42,62 +42,22 @@ function fmt(n: number | null | undefined, digits = 1): string {
   return n.toLocaleString('zh-CN', { maximumFractionDigits: digits, minimumFractionDigits: digits })
 }
 
-// 成交额分档颜色：高成交暖色 → 低成交冷色
-const AMOUNT_COLORS: Record<string, string> = {
-  '100亿+': '#C0392B',
-  '50-100亿': '#E74C3C',
-  '20-50亿': '#E67E22',
-  '10-20亿': '#F39C12',
-  '5-10亿': '#F1C40F',
-  '1-5亿': '#95A5A6',
-  '<1亿': '#5D6D7E'
+// 统一市值档位颜色
+const MKTCAP_COLORS: Record<string, string> = {
+  '1000亿以上': '#8B0000',
+  '500-1000亿': '#E67E22',
+  '200-500亿': '#F1C40F',
+  '100-200亿': '#27AE60',
+  '50-100亿': '#3498DB',
+  '50亿以下': '#7F8C8D'
 }
 
 const amountBuckets = computed(() => liq.value?.amount_buckets ?? [])
+const mcapCountBuckets = computed(() => liq.value?.over_10e_marketcap_buckets ?? [])
+const mcapValueBuckets = computed(() => liq.value?.over_10e_marketcap_value_buckets ?? [])
 
-const amountDistOpt = computed<EChartsOption | null>(() => {
-  const buckets = amountBuckets.value
-  if (!buckets.length) return null
-  return {
-    animation: false,
-    grid: { left: 8, right: 8, top: 24, bottom: 4, containLabel: true },
-    tooltip: {
-      trigger: 'axis',
-      confine: true,
-      backgroundColor: '#131820',
-      borderColor: BORDER,
-      textStyle: { color: TEXT, fontSize: 12 },
-      formatter: (params: unknown) => {
-        const arr = params as { name: string; value: number; dataIndex: number }[]
-        const idx = arr[0]?.dataIndex ?? 0
-        const b = buckets[idx]
-        if (!b) return ''
-        return `<b>${b.label}</b><br/>股票数：${b.count} 只<br/>占全市场：${b.pct}%`
-      }
-    },
-    xAxis: {
-      type: 'category',
-      data: buckets.map((b) => b.label),
-      axisLine: { lineStyle: { color: BORDER } },
-      axisTick: { show: false },
-      axisLabel: { color: MUTED, fontSize: 10, interval: 0 }
-    },
-    yAxis: {
-      type: 'value',
-      splitLine: { lineStyle: { color: BORDER, type: 'dashed' } },
-      axisLabel: { color: MUTED, fontSize: 10 }
-    },
-    series: [{
-      type: 'bar',
-      data: buckets.map((b) => ({
-        value: b.count,
-        itemStyle: { color: AMOUNT_COLORS[b.label] || MUTED, borderRadius: [4, 4, 0, 0] },
-        label: { show: true, position: 'top', color: TEXT, fontSize: 10, formatter: `${b.count}` }
-      })),
-      barMaxWidth: 28
-    }]
-  }
-})
+const activeStockCount = computed(() => mcapCountBuckets.value.reduce((s, b) => s + b.count, 0))
+const activeTotalValue = computed(() => mcapValueBuckets.value.reduce((s, b) => s + b.total_value, 0))
 
 const o10Opt = computed<EChartsOption>(() => ({
   animation: false,
@@ -117,6 +77,74 @@ const o10Opt = computed<EChartsOption>(() => ({
     areaStyle: { color: '#58A6FF22' }
   }]
 }))
+
+// 成交额≥10亿 市值数量 横向条形图（按数量降序）
+const mcapCountBarOpt = computed<EChartsOption | null>(() => {
+  const data = [...mcapCountBuckets.value].filter((b) => b.count > 0).sort((a, b) => b.count - a.count)
+  if (!data.length) return null
+  return {
+    animation: false,
+    grid: { left: 8, right: 80, top: 12, bottom: 4, containLabel: true },
+    tooltip: {
+      trigger: 'axis', confine: true,
+      backgroundColor: '#131820', borderColor: BORDER, textStyle: { color: TEXT, fontSize: 12 },
+      formatter: (params: unknown) => {
+        const arr = params as { name: string; value: number; dataIndex: number }[]
+        const b = data[arr[0]?.dataIndex ?? 0]
+        if (!b) return ''
+        return `<b>${b.label}</b><br/>股票数：${b.count} 只<br/>占活跃：${b.pct}%`
+      }
+    },
+    xAxis: { type: 'value', splitLine: { lineStyle: { color: BORDER, type: 'dashed' } }, axisLabel: { color: MUTED, fontSize: 10 } },
+    yAxis: {
+      type: 'category', data: data.map((b) => b.label),
+      axisLine: { lineStyle: { color: BORDER } }, axisTick: { show: false },
+      axisLabel: { color: TEXT, fontSize: 11 }
+    },
+    series: [{
+      type: 'bar', data: data.map((b) => ({
+        value: b.count,
+        itemStyle: { color: MKTCAP_COLORS[b.label] || MUTED, borderRadius: [0, 4, 4, 0] },
+        label: { show: true, position: 'right', color: TEXT, fontSize: 10, formatter: `${b.count}只 (${b.pct}%)` }
+      })),
+      barMaxWidth: 20
+    }]
+  }
+})
+
+function pieOpt(data: { name: string; value: number }[], centerTitle: string, centerSub: string): EChartsOption | null {
+  if (!data.length) return null
+  return {
+    animation: false,
+    tooltip: {
+      trigger: 'item', confine: true,
+      backgroundColor: '#131820', borderColor: BORDER, textStyle: { color: TEXT, fontSize: 12 },
+      formatter: '{b}<br/>{c} ({d}%)'
+    },
+    title: {
+      text: centerTitle, subtext: centerSub, left: 'center', top: 'center',
+      textStyle: { color: TEXT, fontSize: 18, fontWeight: 'bold' },
+      subtextStyle: { color: MUTED, fontSize: 11 }
+    },
+    series: [{
+      type: 'pie', radius: ['45%', '70%'], center: ['50%', '50%'],
+      label: { color: TEXT, fontSize: 11, formatter: '{b}\n{d}%' },
+      labelLine: { lineStyle: { color: BORDER } },
+      data: data.map((d) => ({ ...d, itemStyle: { color: MKTCAP_COLORS[d.name] || MUTED } }))
+    }]
+  }
+}
+
+const mcapCountPieOpt = computed<EChartsOption | null>(() => {
+  const data = mcapCountBuckets.value.filter((b) => b.count > 0).map((b) => ({ name: b.label, value: b.count }))
+  return pieOpt(data, String(activeStockCount.value), '活跃股票')
+})
+
+const mcapValuePieOpt = computed<EChartsOption | null>(() => {
+  const data = mcapValueBuckets.value.filter((b) => b.total_value > 0).map((b) => ({ name: b.label, value: b.total_value }))
+  const t = activeTotalValue.value / 1e4
+  return pieOpt(data, `${t.toFixed(2)}`, '活跃股票总市值（万亿）')
+})
 
 // 市值 6 档堆叠面积图（hover 显示家数 + 占比）
 const BUCKET_COLORS = ['#1E3A5F', '#2C5282', '#B7410E', '#D97B29', '#F59E0B', '#FF4D4F']
@@ -164,7 +192,7 @@ const stackOpt = computed<EChartsOption | null>(() => {
 <template>
   <div class="page">
     <h1 class="page-title">📐 流动性结构 · <span class="num">{{ daily ? store.formatDay(daily.trade_date) : '—' }}</span></h1>
-    <p class="page-desc">10亿以上活跃家数 + 成交额分档结构 + 市值 6 档结构</p>
+    <p class="page-desc">10亿以上活跃家数 + 成交额结构 + 活跃股市值结构 + 市值 6 档结构</p>
 
     <template v-if="liq && daily">
       <div class="card-grid cols-4">
@@ -190,9 +218,61 @@ const stackOpt = computed<EChartsOption | null>(() => {
       </div>
 
       <div class="card" style="margin-top:14px">
-        <div class="card-title">🔥 成交额分档结构（当日单票成交额）</div>
-        <ChartPanel v-if="amountDistOpt" :option="amountDistOpt" height="260px" />
-        <div v-else class="empty-box">🟡 暂无成交额分档数据</div>
+        <div class="card-title">📊 全市场成交额结构</div>
+        <div class="table-wrap" style="margin-top:8px">
+          <table class="data">
+            <thead><tr><th>成交额区间</th><th>股票数量</th><th>占全市场比例</th></tr></thead>
+            <tbody>
+              <tr v-for="b in amountBuckets" :key="b.label">
+                <td>{{ b.label }}</td><td class="num">{{ b.count }}</td><td class="num">{{ b.pct }}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="card-title">🏢 成交额≥10亿股票市值分布（{{ activeStockCount }} 只）</div>
+        <div class="card-grid cols-2" style="margin-top:8px">
+          <div>
+            <ChartPanel v-if="mcapCountBarOpt" :option="mcapCountBarOpt" height="260px" />
+            <div v-else class="empty-box">🟡 无数据</div>
+          </div>
+          <div>
+            <ChartPanel v-if="mcapCountPieOpt" :option="mcapCountPieOpt" height="260px" />
+            <div v-else class="empty-box">🟡 无数据</div>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-top:8px">
+          <table class="data">
+            <thead><tr><th>市值区间</th><th>股票数量</th><th>占活跃股票比例</th></tr></thead>
+            <tbody>
+              <tr v-for="b in mcapCountBuckets" :key="b.label">
+                <td><span class="dot" :style="{ background: MKTCAP_COLORS[b.label] }"></span>{{ b.label }}</td>
+                <td class="num">{{ b.count }}</td><td class="num">{{ b.pct }}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="card-title">💰 成交额≥10亿股票市值贡献结构（合计 {{ (activeTotalValue / 1e4).toFixed(2) }} 万亿）</div>
+        <ChartPanel v-if="mcapValuePieOpt" :option="mcapValuePieOpt" height="280px" />
+        <div v-else class="empty-box">🟡 无数据</div>
+        <div class="table-wrap" style="margin-top:8px">
+          <table class="data">
+            <thead><tr><th>市值区间</th><th>股票数量</th><th>合计市值（亿）</th><th>占活跃股票总市值</th></tr></thead>
+            <tbody>
+              <tr v-for="b in mcapValueBuckets" :key="b.label">
+                <td><span class="dot" :style="{ background: MKTCAP_COLORS[b.label] }"></span>{{ b.label }}</td>
+                <td class="num">{{ b.count }}</td>
+                <td class="num">{{ fmt(b.total_value, 0) }}</td>
+                <td class="num">{{ b.pct }}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div class="card" style="margin-top:14px">
@@ -203,24 +283,9 @@ const stackOpt = computed<EChartsOption | null>(() => {
 
       <div class="table-wrap" style="margin-top:10px">
         <table class="data">
-          <thead>
-            <tr><th>档位</th><th>家数</th><th>占比</th></tr>
-          </thead>
+          <thead><tr><th>档位</th><th>家数</th><th>占比</th></tr></thead>
           <tbody>
             <tr v-for="b in liq.mktcap_buckets" :key="b.label">
-              <td>{{ b.label }}</td><td class="num">{{ b.count }}</td><td class="num">{{ b.pct }}%</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="table-wrap" style="margin-top:10px" v-if="liq.amount_buckets?.length">
-        <table class="data">
-          <thead>
-            <tr><th>成交额档位</th><th>家数</th><th>占比</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="b in liq.amount_buckets" :key="b.label">
               <td>{{ b.label }}</td><td class="num">{{ b.count }}</td><td class="num">{{ b.pct }}%</td>
             </tr>
           </tbody>
@@ -232,3 +297,13 @@ const stackOpt = computed<EChartsOption | null>(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 8px;
+}
+</style>

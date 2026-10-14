@@ -13,7 +13,7 @@ export interface NavEntry {
 const nav: NavEntry[] = [
   { path: '/', icon: '🏠', label: '今日速览', enabled: true },
   { path: '/money', icon: '💰', label: '资金面', enabled: true },
-  { path: '/index', icon: '📊', label: '指数成交', enabled: true },
+  { path: '/index', icon: '📊', label: '指数观察', enabled: true },
   { path: '/widebase', icon: '🧩', label: '宽基矩阵', enabled: true },
   { path: '/industry', icon: '🏭', label: '行业', enabled: true },
   { path: '/concentration', icon: '🎯', label: '个股集中度', enabled: true },

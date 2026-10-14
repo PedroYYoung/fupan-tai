@@ -165,6 +165,20 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
                 r["rank_1y"] = compute.rank_of(svals, r["amount"])
             r["pctile_all"] = compute.pctile(svals, r["amount"])
 
+    # ---- 指数观察（YTD + 本周/本月/年内均额）----
+    index_observation = []
+    for r in idx_rows + wide_rows:
+        index_observation.append({
+            "code": r["code"], "name": r["name"],
+            "ytd_pct": index_mod.get_index_ytd_pct(r["code"], date),
+            "avg_week_amount": compute.avg_index_amount(r["code"], date, dates, "week"),
+            "avg_month_amount": compute.avg_index_amount(r["code"], date, dates, "month"),
+            "avg_year_amount": compute.avg_index_amount(r["code"], date, dates, "year"),
+        })
+
+    # ---- 行业周涨跌排名 ----
+    industry_week_rank = industry_mod.get_industry_week_rank(date, dates)
+
     # ---- sparklines（近20日，供 M0 迷你折线）----
     def spark(key: str, n=20):
         import json
@@ -187,7 +201,9 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
         "overview": overview,
         "index_volume": idx_rows,
         "widebase": wide_rows,
+        "index_observation": index_observation,
         "industry": industry,
+        "industry_week_rank": industry_week_rank,
         "concentration": conc or {"top_n": [10, 20, 50], "top10": [], "top20": [],
                                   "top50": [], "top20_cum_pct": 0, "top50_cum_pct": 0,
                                   "top10_total_pctile_hist": None},
@@ -196,6 +212,8 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
             "pctile_count": compute.pctile(series_values("over_10e_count"), over_cnt),
             "mktcap_buckets": compute.mktcap_buckets(spot_df),
             "amount_buckets": compute.amount_buckets(spot_df),
+            "over_10e_marketcap_buckets": compute.over_10e_marketcap_buckets(spot_df),
+            "over_10e_marketcap_value_buckets": compute.over_10e_marketcap_value_buckets(spot_df),
         },
         "emotion": {
             "limit_up": limit_up, "limit_down": limit_down,

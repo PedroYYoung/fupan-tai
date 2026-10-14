@@ -6,6 +6,7 @@ import type { IndustryRow } from '../types'
 const store = useDataStore()
 const daily = computed(() => store.daily)
 const industry = computed(() => daily.value?.industry)
+const weekRank = computed(() => daily.value?.industry_week_rank)
 
 function cls(v: number): string {
   return v >= 0 ? 'up' : 'down'
@@ -16,6 +17,9 @@ function fmt(n: number | null | undefined, digits = 1): string {
 }
 function sign(v: number): string {
   return v > 0 ? '+' : ''
+}
+function rankCls(v: number): string {
+  return v > 0 ? 'up' : v < 0 ? 'down' : 'muted'
 }
 </script>
 
@@ -56,6 +60,37 @@ function sign(v: number): string {
                   <td class="num muted">{{ fmt(r.ratio, 2) }}%</td>
                 </tr>
                 <tr v-if="!industry.top10_down.length"><td colspan="4" class="muted">无数据</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="weekRank" class="card-grid cols-2" style="margin-top:14px">
+        <div class="card">
+          <div class="card-title up">📈 本周涨幅 TOP5</div>
+          <div class="table-wrap" style="margin-top:8px">
+            <table class="data">
+              <thead><tr><th>行业</th><th>本周涨幅</th></tr></thead>
+              <tbody>
+                <tr v-for="r in weekRank.top5" :key="r.name">
+                  <td>{{ r.name }}</td>
+                  <td class="num" :class="rankCls(r.change)">{{ sign(r.change) }}{{ fmt(r.change, 2) }}%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title down">📉 本周跌幅 TOP5</div>
+          <div class="table-wrap" style="margin-top:8px">
+            <table class="data">
+              <thead><tr><th>行业</th><th>本周跌幅</th></tr></thead>
+              <tbody>
+                <tr v-for="r in weekRank.bottom5" :key="r.name">
+                  <td>{{ r.name }}</td>
+                  <td class="num" :class="rankCls(r.change)">{{ sign(r.change) }}{{ fmt(r.change, 2) }}%</td>
+                </tr>
               </tbody>
             </table>
           </div>
