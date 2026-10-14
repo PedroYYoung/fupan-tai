@@ -29,7 +29,8 @@ export interface Overview {
 export interface IndexRow {
   name: string
   code: string
-  amount: number
+  /** 当日成交额（亿）；接口抓取失败时为 null */
+  amount: number | null
   rank_year: number | null
   rank_1y: number | null
   pctile_all: number | null

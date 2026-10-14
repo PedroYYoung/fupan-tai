@@ -67,6 +67,8 @@ function fmt(n: number | null | undefined, digits = 0): string {
 
 function sub(c: Cell): string {
   if (period.value === 'day') {
+    // 当日成交额接口未取到值：明确标注「未获取」，避免与「样本不足」混淆
+    if (c.amount == null) return '当日成交额未获取'
     const p = c.pctile != null && nAll.value >= 30 ? `历史 ${c.pctile}%` : '样本不足'
     return `近一年第 ${c.rank1y ?? '—'} 名 · ${p}`
   }
