@@ -238,6 +238,22 @@ def test_ak_spot():
         record("AKShare stock_zh_a_spot_em", "东财", False, note=f"异常: {type(e).__name__} {e}")
 
 
+def critical_gate() -> bool:
+    """CI 指数数据源真实门禁。
+
+    verify 长期「恒绿」是误导来源：此前 main() 只统计 ok/total 并不失败，
+    导致东财全线被封、指数序列停更时，流水线仍显示全绿。
+    这里只对「CI 下真正承压的独立指数源」判定：腾讯实时 与 baostock。
+    东财系（spot/行业/index_zh_a_hist）在 CI 预期失败，不计入门禁。
+    两者全挂 → 指数数据已无源可依，返回 False 以阻断后续构建。
+    """
+    tencent_ok = any(r["source"] == "腾讯实时行情" and r["ok"] for r in RESULTS)
+    baostock_ok = any(r["source"] == "baostock 上证指数日线" and r["ok"] for r in RESULTS)
+    print(f"[gate] 腾讯实时={tencent_ok} baostock={baostock_ok} → "
+          f"{'PASS' if (tencent_ok or baostock_ok) else 'FAIL'}")
+    return tencent_ok or baostock_ok
+
+
 def main():
     print(f"验证日期: {TARGET} ({DATE_HYPHEN})")
     flush_log()
@@ -248,16 +264,23 @@ def main():
     test_szse_margin()
     test_ak_index_hist()
     test_ak_spot()
+    critical_gate_result = critical_gate()
     section("验证汇总")
     ok = sum(1 for r in RESULTS if r["ok"])
     total = len(RESULTS)
     print(f"通过 {ok}/{total}")
     with open("scripts/_cache/verify_data_sources_report.json", "w", encoding="utf-8") as f:
-        json.dump({"target": TARGET, "ok": ok, "total": total, "results": RESULTS}, f, ensure_ascii=False, indent=2)
+        json.dump({"target": TARGET, "ok": ok, "total": total,
+                   "critical_gate": critical_gate_result, "results": RESULTS},
+                  f, ensure_ascii=False, indent=2)
     print("报告已写入 scripts/_cache/verify_data_sources_report.json")
     sys.stdout = OLD_STDOUT
     sys.stderr = OLD_STDERR
     print(LOG_BUF.getvalue())
+    if not critical_gate_result:
+        print("CRITICAL: CI 可用指数数据源（腾讯实时 / baostock）全部失败，"
+              "指数成交额已无源可依，终止本次流程以避免覆盖为 0/空值。")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

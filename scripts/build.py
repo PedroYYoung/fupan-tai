@@ -26,9 +26,15 @@ from modules.common import (DATA_DIR, REPO_ROOT, atomic_write_json, log,  # noqa
 from modules import calendar_mod, compute, index_mod, industry_mod, margin_mod, notify, spot_mod, zt_mod  # noqa: E402
 
 
+# 北京时间（UTC+8）。GitHub Actions runner 的本地时间是 UTC，
+# 若用 naive now() 判定 16:00 收盘阈值，UTC 下全天都会被视为「今日未收盘」，
+# 流水线将永远指向前一交易日，并连带使「行情日期须等于目标交易日」的腾讯通道失效。
+_CST = datetime.timezone(datetime.timedelta(hours=8))
+
+
 def last_closed_trade_date(dates: list) -> str:
-    """最近一个已收盘的交易日（今天 16:00 前视为未收盘）"""
-    now = datetime.datetime.now()
+    """最近一个已收盘的交易日（北京时间 16:00 前视为未收盘）"""
+    now = datetime.datetime.now(_CST)
     today = now.strftime("%Y%m%d")
     cutoff = now.replace(hour=16, minute=0, second=0, microsecond=0)
     past = [d for d in dates if d <= today]

@@ -3,6 +3,7 @@
 恒生科技以 ETF 513180 成交额近似（UI 标注「近似值」）。
 """
 import re
+import time
 
 import akshare as ak
 import requests
@@ -21,8 +22,8 @@ INDEX_CODES = {
 }
 
 # 已验证可用腾讯行情的代码（verify_data_sources.py 实测）
-# 注：腾讯不提供 bj899050(北证50)/sh932000(中证2000) 的实时行情，
-# 这两项即便在白名单内，腾讯通道也会返回 None，最终依赖东财主源。
+# 注：腾讯实时行情实测可覆盖 13/14 代码（含 bj899050 北证50、sh000688 科创50）；
+# 仅 sh932000(中证2000) 在腾讯无对应符号，改由中证指数官网 tradingValue 通道补齐。
 _TENCENT_ENABLED = {
     "sh000001", "sz399001", "sz399006", "sh000688", "bj899050",
     "sh000016", "sh000300", "sz399673", "sh000905", "sh000906",
@@ -95,13 +96,143 @@ def _tencent_index_amount(code: str, date: str):
         return None
 
 
-def get_index_amount(code: str, date: str):
-    """返回当日成交额（亿元）；源无成交额或失败返回 None。
+# ------------------------------------------------------------------
+# 独立备用源（东财在 CI 被封时的通道）：中证指数官网 / baostock
+# ------------------------------------------------------------------
+# baostock 支持「指数日成交额」的代码子集（amount 字段，单位：元）
+_BS_CODE_MAP = {
+    "sh000001": "sh.000001", "sz399001": "sz.399001", "sz399006": "sz.399006",
+    "sh000688": "sh.000688", "sh000016": "sh.000016", "sh000300": "sh.000300",
+    "sz399673": "sz.399673", "sh000905": "sh.000905", "sh000906": "sh.000906",
+    "sh000852": "sh.000852", "hstech_513180": "sh.513180",
+}
+# 中证指数公司官网：tradingValue 即成交额（亿元），权威源，
+# 覆盖东财/腾讯/baostock 都取不全的中证系（含 932000 中证2000、000688 科创50）
+_CSINDEX_CODE_MAP = {
+    "sh000016": "000016", "sh000300": "000300", "sh000688": "000688",
+    "sh000905": "000905", "sh000906": "000906", "sh000852": "000852",
+    "sh932000": "932000", "sh000985": "000985",
+}
+_CSINDEX_URL = "https://www.csindex.com.cn/csindex-home/perf/index-perf"
+_CSINDEX_HEADERS = {"User-Agent": "Mozilla/5.0",
+                    "Referer": "https://www.csindex.com.cn/"}
 
-    策略：
-    1. 先尝试东财 AKShare 日线（index_zh_a_hist / fund_etf_hist_em）
-    2. 东财失败或返回空 → 降级腾讯批量行情（独立通道，已验证字段/单位）
-    3. 腾讯同样失败 → 返回 None，调用方保留旧数据
+
+# 中证官网偶发 SSL 中断（UNEXPECTED_EOF），用带退避重试的 Session 提升 CI 稳定性
+_CSINDEX_SESSION = requests.Session()
+_CSINDEX_SESSION.headers.update(_CSINDEX_HEADERS)
+_CSINDEX_SESSION.mount(
+    "https://",
+    requests.adapters.HTTPAdapter(
+        max_retries=requests.packages.urllib3.util.retry.Retry(
+            total=5, backoff_factor=0.5,
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=frozenset(["GET"]))))
+
+
+def _get_csindex_history(code: str, start: str, end: str) -> dict:
+    """中证指数官网区间成交额 {date: 亿元}；不适用或失败返回 {}。"""
+    cs = _CSINDEX_CODE_MAP.get(code)
+    if not cs:
+        return {}
+    last_err = None
+    for attempt in range(6):
+        try:
+            r = _CSINDEX_SESSION.get(_CSINDEX_URL,
+                                     params={"indexCode": cs,
+                                             "startDate": _bs_date(start),
+                                             "endDate": _bs_date(end)},
+                                     timeout=12)
+            out = {}
+            for row in (r.json().get("data") or []):
+                d = str(row.get("tradeDate") or "")
+                v = row.get("tradingValue")
+                if len(d) == 8 and v is not None and float(v) > 0:
+                    out[d] = round(float(v), 2)
+            if out:
+                return out
+            last_err = "返回空 data"
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            time.sleep(0.6 * (attempt + 1))
+    log(f"中证官网 {code} 区间获取失败（已重试 6 次）：{last_err}")
+    return {}
+
+
+def _get_csindex_amount(code: str, date: str):
+    """中证指数官网单日成交额（亿元）；不适用或失败返回 None。"""
+    return _get_csindex_history(code, date, date).get(date)
+
+
+def _get_bs_history(code: str, start: str, end: str) -> dict:
+    """baostock 区间成交额 {date: 亿元}；不适用或失败返回 {}。"""
+    bsc = _BS_CODE_MAP.get(code)
+    if not bsc:
+        return {}
+    try:
+        import baostock as bs
+        _bs_login()
+        rs = bs.query_history_k_data_plus(bsc, "date,amount",
+                                          start_date=_bs_date(start),
+                                          end_date=_bs_date(end),
+                                          frequency="d", adjustflag="3")
+        if rs is None or rs.error_code != "0":
+            log(f"baostock {code} 区间失败：{getattr(rs, 'error_msg', '无返回')}")
+            return {}
+        out = {}
+        while rs.next():
+            row = rs.get_row_data()
+            try:
+                v = float(row[1])
+            except (TypeError, ValueError):
+                continue
+            if v > 0:
+                out[str(row[0]).replace("-", "")] = round(v / 1e8, 2)
+        return out
+    except Exception as e:  # noqa: BLE001
+        log(f"baostock {code} 区间异常：{e}")
+        return {}
+
+
+def _get_bs_amount(code: str, date: str):
+    """baostock 单日成交额（亿元）；不适用或失败返回 None。"""
+    return _get_bs_history(code, date, date).get(date)
+
+
+def get_index_amount_history(code: str, start: str, end: str) -> dict:
+    """区间指数成交额 {date: 亿元}；多源回退：东财 → baostock → 中证官网。"""
+    pure = code[2:]
+    try:
+        if code == "hstech_513180":
+            df = retry(lambda: ak.fund_etf_hist_em(symbol="513180", period="daily",
+                       start_date=start, end_date=end, adjust=""), what=f"ETF回补{code}")
+            col = "成交额"
+        else:
+            df = retry(lambda: ak.index_zh_a_hist(symbol=pure, period="daily",
+                       start_date=start, end_date=end), what=f"指数回补{code}")
+            col = "成交额" if "成交额" in df.columns else "amount"
+        vals = {str(r["日期"]).replace("-", ""): round(float(r[col]) / 1e8, 2)
+                for _, r in df.iterrows()}
+        if vals:
+            return vals
+    except Exception as e:  # noqa: BLE001
+        log(f"指数回补东财 {code} 失败：{e}")
+    # baostock 优先（快、覆盖广）；中证官网仅兜底（覆盖 932000/000688/000985）
+    vals = _get_bs_history(code, start, end)
+    if vals:
+        return vals
+    return _get_csindex_history(code, start, end)
+
+
+def get_index_amount(code: str, date: str):
+    """返回当日成交额（亿元）；全部数据源失败返回 None（绝不伪造）。
+
+    策略（任一成功即返回）：
+    1. 东财 AKShare 日线（本地/未封禁环境主源）
+    2. 腾讯实时行情（CI 可用；仅当日，严格校验「行情日期 == 目标交易日」）
+    3. baostock 日线（CI 安全历史源；快、覆盖 10/14 代码）
+    4. 中证指数官网 tradingValue（CI 安全兜底；补 932000/000688/000985 缺口）
+    5. 全部失败 → None，调用方保留旧数据
     """
     # 通道 1：东财
     try:
@@ -121,8 +252,23 @@ def get_index_amount(code: str, date: str):
     except Exception as e:  # noqa: BLE001
         log(f"指数 {code} {date} 东财获取失败：{e}")
 
-    # 通道 2：腾讯（独立通道，字段已实测验证）
-    return _tencent_index_amount(code, date)
+    # 通道 2：腾讯实时（CI 可用；仅当日）
+    amt = _tencent_index_amount(code, date)
+    if amt is not None:
+        return amt
+
+    # 通道 3：baostock（CI 安全历史源；快、覆盖 10/14 代码）
+    amt = _get_bs_amount(code, date)
+    if amt is not None:
+        return amt
+
+    # 通道 4：中证指数官网（CI 安全历史源；兜底 932000/000688/000985）
+    amt = _get_csindex_amount(code, date)
+    if amt is not None:
+        return amt
+
+    log(f"指数 {code} {date} 全部数据源失败 → None（调用方保留旧数据）")
+    return None
 
 
 # ------------------------------------------------------------------

@@ -39,6 +39,8 @@ jobs:
           path: scripts/_cache/verify_data_sources_report.json
 
   build:
+    # 门禁真正生效：verify-sources 判定 CI 可用指数源全挂时失败，build 不再照跑
+    needs: verify-sources
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:

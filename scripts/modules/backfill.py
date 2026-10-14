@@ -6,26 +6,18 @@
 - 两融 / 涨跌停池：逐日拉取（窗口内的日期），批量合并写入
 - over_10e / 市值分档 / 前10集中度依赖当日全市场快照，不可历史回补（每日增量累积）
 
-数据源：AKShare（东财指数日线 / 交易所两融 / 东财涨跌停池）。
-本地网络对东财受限时，可经由 GitHub Actions workflow_dispatch 触发本模块（云端无限制）。
+数据源（多源回退，缺一不可）：东财 AKShare → 中证指数官网 → baostock。
+注意：东财在 GitHub Actions runner 上同样被反爬封锁（并非「云端无限制」），
+因此指数历史成交额以 中证官网/baostock 作为 CI 下的实际主力源。
 """
-import akshare as ak
-from .common import log, retry
+from .common import log
 from . import compute, index_mod, margin_mod, zt_mod
-
-_PROXY_CODES = {"sh": "000001", "sz": "399001"}
 
 
 def _index_amount_df(market: str, start: str, end: str) -> dict:
-    """指数日线 → {date: 成交额亿}（东财区间接口）"""
-    df = retry(lambda: ak.index_zh_a_hist(symbol=_PROXY_CODES[market], period="daily",
-                                          start_date=start, end_date=end),
-               what=f"指数回补{market}", times=2)
-    out = {}
-    for _, r in df.iterrows():
-        d = str(r["日期"]).replace("-", "")
-        out[d] = round(float(r["成交额"]) / 1e8, 2)
-    return out
+    """沪/深指数代理日成交额 {date: 成交额亿}（多源回退：东财 → 中证官网 → baostock）"""
+    code = "sh000001" if market == "sh" else "sz399001"
+    return index_mod.get_index_amount_history(code, start, end)
 
 
 def backfill_series(window: list, dates: list):
@@ -34,22 +26,13 @@ def backfill_series(window: list, dates: list):
     start_all = "20150101"  # 指数序列全历史回补
     log(f"===== 序列回补：窗口 {window[0]} ~ {window[-1]}（{len(window)} 天）；指数全历史 =====")
 
-    # 1) 指数/宽基成交额（全部 15 个代码，含 baostock 覆盖不到的科创50/中证2000/北证50）
+    # 1) 指数/宽基成交额（全部 14 个代码；多源回退：东财 → baostock → 中证官网）
     for code, name in index_mod.INDEX_CODES.items():
         try:
-            if code == "hstech_513180":
-                df = retry(lambda: ak.fund_etf_hist_em(symbol="513180", period="daily",
-                                                       start_date=start_all, end_date=target,
-                                                       adjust=""), what="ETF回补")
-                col = "成交额"
-            else:
-                pure = code[2:]
-                df = retry(lambda: ak.index_zh_a_hist(symbol=pure, period="daily",
-                                                      start_date=start_all, end_date=target),
-                           what=f"指数回补{code}")
-                col = "成交额" if "成交额" in df.columns else "amount"
-            vals = {str(r["日期"]).replace("-", ""): round(float(r[col]) / 1e8, 2)
-                    for _, r in df.iterrows()}
+            vals = index_mod.get_index_amount_history(code, start_all, target)
+            if not vals:
+                log(f"{code} {name}: 所有历史源均无数据，跳过（保留旧数据）")
+                continue
             compute.write_series_merge(f"index_amount_{code}", name, "亿元", vals)
             log(f"{code} {name}: 合并 {len(vals)} 点")
         except Exception as e:  # noqa: BLE001
