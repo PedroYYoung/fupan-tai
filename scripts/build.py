@@ -72,25 +72,47 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
     log(f"===== 构建交易日 {date} =====")
     spot_df = spot_mod.get_spot(date)
 
-    # ---- 指数/宽基成交额（含当日 + 回补窗口）----
+    # ---- 序列读取工具（指数降级需要「最近交易日真实值」，须先定义）----
+    def series_points(key: str) -> list:
+        import json
+        p = os.path.join(DATA_DIR, "series", f"{key}.json")
+        if not os.path.exists(p):
+            return []
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f).get("points", [])
+
+    def series_values(key: str) -> list:
+        return [pt["value"] for pt in series_points(key)]
+
+    def last_known_point(code: str):
+        """序列中最近一个早于 date 的已知真实值 → (value, date)；无则 (None, None)"""
+        for pt in reversed(series_points(f"index_amount_{code}")):
+            if pt["date"] < date and pt.get("value") is not None:
+                return pt["value"], pt["date"]
+        return None, None
+
+    # ---- 指数/宽基成交额（含当日 + 降级：最近交易日 / ETF 代理）----
     def fetch_index_rows(d: str):
         rows_idx, rows_wide = [], []
+
+        def make_row(code: str, base_approx: bool):
+            amt, amt_date, note = index_mod.get_index_amount_resilient(
+                code, d, last_known_point(code))
+            return {"name": index_mod.INDEX_CODES[code], "code": code,
+                    "amount": amt, "amount_date": amt_date, "note": note,
+                    "rank_year": None, "rank_1y": None, "pctile_all": None,
+                    "approx": (base_approx and amt is not None) or note != ""}
+
         for code in ["sh000001", "sz399001", "sz399006", "sh000688", "bj899050"]:
-            amt = index_mod.get_index_amount(code, d)
-            rows_idx.append({"name": index_mod.INDEX_CODES[code], "code": code,
-                             "amount": amt, "rank_year": None, "rank_1y": None,
-                             "pctile_all": None, "approx": code == "bj899050" and amt is not None})
+            rows_idx.append(make_row(code, code == "bj899050"))
         for code in ["sh000016", "sh000300", "sz399673", "sh000688", "sh000905",
                      "sh000906", "sh000852", "sh932000", "sh000985", "hstech_513180"]:
-            amt = index_mod.get_index_amount(code, d)
-            rows_wide.append({"name": index_mod.INDEX_CODES[code], "code": code,
-                              "amount": amt, "rank_1y": None, "pctile_all": None,
-                              "approx": code == "hstech_513180"})
+            rows_wide.append(make_row(code, code == "hstech_513180"))
         # 微盘代理：第 11 格
         micro_amt, micro_n = compute.microcap_proxy_amount(spot_df)
         rows_wide.append({"name": "微盘代理(自建)", "code": "micro_proxy",
-                          "amount": micro_amt, "rank_1y": None, "pctile_all": None,
-                          "approx": False})
+                          "amount": micro_amt, "amount_date": date, "note": "",
+                          "rank_1y": None, "pctile_all": None, "approx": False})
         log(f"微盘代理：市值后10%（N={micro_n}）等权日均成交 {micro_amt} 亿")
         return rows_idx, rows_wide
 
@@ -130,17 +152,7 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
     }
 
     # ---- 序列维护（当日 + 可选回补窗口；重算后回填排名/百分位）----
-    def series_points(key: str) -> list:
-        import json
-        p = os.path.join(DATA_DIR, "series", f"{key}.json")
-        if not os.path.exists(p):
-            return []
-        with open(p, "r", encoding="utf-8") as f:
-            return json.load(f).get("points", [])
-
-    def series_values(key: str) -> list:
-        return [pt["value"] for pt in series_points(key)]
-
+    # 注：series_points / series_values 已在上方定义（指数降级需要提前读取序列）
     compute.update_series("total_amount", "两市成交额", "亿元", date, total_amount)
     pts = series_points("total_amount")
     vals = [p["value"] for p in pts]
@@ -163,13 +175,19 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
         compute.update_series("top10_concentration", "前10成交占比", "%",
                               date, conc["top10_total"])
     for r in idx_rows + wide_rows:
-        if r["amount"] is not None:
-            key = f"index_amount_{r['code']}"
+        if r["amount"] is None:
+            continue
+        # ETF 代理值与指数自身历史量级不可比，不写序列、不做历史排名/百分位
+        if r.get("note") == "etf_proxy":
+            continue
+        key = f"index_amount_{r['code']}"
+        # 仅当日真实抓取成功才写入序列；降级值（最近交易日）不写，避免污染历史口径
+        if r.get("amount_date") == date and not r.get("note"):
             compute.update_series(key, r["name"], "亿元", date, r["amount"])
-            svals = series_values(key)
-            if r.get("rank_1y") is None:
-                r["rank_1y"] = compute.rank_of(svals, r["amount"])
-            r["pctile_all"] = compute.pctile(svals, r["amount"])
+        svals = series_values(key)
+        if r.get("rank_1y") is None:
+            r["rank_1y"] = compute.rank_of(svals, r["amount"])
+        r["pctile_all"] = compute.pctile(svals, r["amount"])
 
     # ---- 指数观察（YTD + 本周/本月/年内均额）----
     index_observation = []

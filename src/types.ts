@@ -29,8 +29,12 @@ export interface Overview {
 export interface IndexRow {
   name: string
   code: string
-  /** 当日成交额（亿）；接口抓取失败时为 null */
+  /** 当日成交额（亿）；接口抓取失败且无历史可降级时为 null */
   amount: number | null
+  /** 成交额实际对应的交易日；降级时早于当前交易日 */
+  amount_date?: string | null
+  /** 取数说明：'' 当日真实值 / 'last_trading_day' 取自最近交易日 / 'etf_proxy' ETF 代理 */
+  note?: string | null
   rank_year: number | null
   rank_1y: number | null
   pctile_all: number | null

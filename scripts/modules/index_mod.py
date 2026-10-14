@@ -22,12 +22,13 @@ INDEX_CODES = {
 }
 
 # 已验证可用腾讯行情的代码（verify_data_sources.py 实测）
-# 注：腾讯实时行情实测可覆盖 13/14 代码（含 bj899050 北证50、sh000688 科创50）；
-# 仅 sh932000(中证2000) 在腾讯无对应符号，改由中证指数官网 tradingValue 通道补齐。
+# 注：腾讯实时行情实测覆盖 13/14 代码（含 bj899050 北证50、sh000688 科创50）。
+# sh932000(中证2000) 在腾讯无对应符号（实测返回空壳，仅 1 个字段），故不在白名单内；
+# 该代码改由「同标的 ETF 代理」通道兜底（见 _ETF_PROXY_BS）。
 _TENCENT_ENABLED = {
     "sh000001", "sz399001", "sz399006", "sh000688", "bj899050",
     "sh000016", "sh000300", "sz399673", "sh000905", "sh000906",
-    "sh000852", "sh932000", "sh000985", "hstech_513180",
+    "sh000852", "sh000985", "hstech_513180",
 }
 
 # 腾讯行情代码映射：去掉 sh/sz/bj 前缀；ETF 特殊处理
@@ -106,8 +107,22 @@ _BS_CODE_MAP = {
     "sz399673": "sz.399673", "sh000905": "sh.000905", "sh000906": "sh.000906",
     "sh000852": "sh.000852", "hstech_513180": "sh.513180",
 }
+
+# ------------------------------------------------------------------
+# 最后兜底：同标的 ETF 代理
+# ------------------------------------------------------------------
+# 中证2000(932000) 在四个常规通道均无可用数据：
+#   东财 —— CI 环境 push2 被封；腾讯 —— 无该符号；baostock —— 无该指数代码；
+#   中证官网 —— index-perf 接口当前对所有指数返回空 data（通道已失效）。
+# 故用同标的中规模最大、成交最活跃的 ETF 成交额顶上。
+# 注意：ETF 成交额与指数成交额量级不可比（约 5 亿 vs 约 1500 亿），
+# 仅作方向参考，调用方必须标注 approx 且不做历史排名/百分位。
+_ETF_PROXY_BS = {
+    "sh932000": "sh.563300",   # 华泰柏瑞中证2000ETF
+}
 # 中证指数公司官网：tradingValue 即成交额（亿元），权威源，
 # 覆盖东财/腾讯/baostock 都取不全的中证系（含 932000 中证2000、000688 科创50）
+# 注：2026-10 实测该接口对所有指数均返回空 data，通道目前实际不可用，仅保留待其恢复。
 _CSINDEX_CODE_MAP = {
     "sh000016": "000016", "sh000300": "000300", "sh000688": "000688",
     "sh000905": "000905", "sh000906": "000906", "sh000852": "000852",
@@ -269,6 +284,68 @@ def get_index_amount(code: str, date: str):
 
     log(f"指数 {code} {date} 全部数据源失败 → None（调用方保留旧数据）")
     return None
+
+
+def get_etf_proxy_amount(code: str, date: str):
+    """最后兜底：同标的 ETF 当日成交额（亿元）。
+
+    仅在 _ETF_PROXY_BS 中配置过的代码才启用（当前只有 sh932000）。
+    ETF 成交额与指数成交额量级不可比，调用方须标注 approx 且不参与历史排名。
+    不适用或失败返回 None（绝不伪造）。
+    """
+    bsc = _ETF_PROXY_BS.get(code)
+    if not bsc:
+        return None
+    try:
+        import baostock as bs
+        _bs_login()
+        rs = bs.query_history_k_data_plus(
+            bsc, "date,amount", start_date=_bs_date(date), end_date=_bs_date(date),
+            frequency="d", adjustflag="3")
+        if rs is None or rs.error_code != "0":
+            log(f"ETF代理 {code}<-{bsc} {date} 失败：{getattr(rs, 'error_msg', '无返回')}")
+            return None
+        while rs.next():
+            row = rs.get_row_data()
+            try:
+                v = float(row[1])
+            except (TypeError, ValueError):
+                return None
+            if v > 0:
+                amt = round(v / 1e8, 2)
+                log(f"ETF代理 {code}<-{bsc} {date} 成交额 {amt} 亿（量级不可比，仅方向参考）")
+                return amt
+    except Exception as e:  # noqa: BLE001
+        log(f"ETF代理 {code} {date} 异常：{e}")
+    return None
+
+
+def get_index_amount_resilient(code: str, date: str, last_known=None):
+    """带降级的当日成交额：当日取不到时用最近交易日数据顶上，避免矩阵整格空白。
+
+    返回 (amount, amount_date, note)：
+      note=""                 当日真实抓取成功
+      note="last_trading_day" 当日失败，复用序列中最近一个早于当日的真实值
+      note="etf_proxy"        当日与最近交易日均无真实值，用同标的 ETF 代理（量级不可比）
+
+    last_known: 由调用方从已落盘序列读取的 (value, date)，避免为此多打一次网络请求。
+    全部分支失败返回 (None, None, "")。
+    """
+    amt = get_index_amount(code, date)
+    if amt is not None:
+        return amt, date, ""
+    # 降级 1：最近一个已落盘的真实交易日数据（复用自身历史，非伪造）
+    if last_known:
+        v, vd = last_known
+        if v is not None and vd and str(vd) <= date:
+            log(f"指数 {code} {date} 当日无数据 → 降级复用最近交易日 {vd} 的 {v} 亿")
+            return v, str(vd), "last_trading_day"
+    # 降级 2：同标的 ETF 代理（仅方向参考）
+    v = get_etf_proxy_amount(code, date)
+    if v is not None:
+        return v, date, "etf_proxy"
+    log(f"指数 {code} {date} 当日/最近交易日/ETF代理 全部失败 → 置空")
+    return None, None, ""
 
 
 # ------------------------------------------------------------------
