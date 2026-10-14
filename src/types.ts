@@ -71,6 +71,10 @@ export interface StockRow {
   change?: number
   board?: string
   pct_of_total?: number
+  /** 一级行业（如后端/映射表提供） */
+  lv1?: string
+  /** 二级行业（如后端/映射表提供） */
+  lv2?: string
 }
 
 export interface Bucket {

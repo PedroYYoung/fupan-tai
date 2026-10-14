@@ -34,6 +34,13 @@ function fmt(n: number | null | undefined, digits = 2): string {
 
 const top50 = computed<StockRow[]>(() => conc.value?.top50 ?? [])
 
+// 行业显示：优先使用已有的 lv1 / lv2；当前数据未提供时显示 —
+function industryText(row: StockRow): string {
+  if (row.lv1 && row.lv2) return `${row.lv1} / ${row.lv2}`
+  if (row.lv1) return row.lv1
+  return '—'
+}
+
 // 三个辅助指标：Top10 / Top20 / Top50 成交占比
 const share10 = computed(() => top50.value.slice(0, 10).reduce((s, x) => s + (x.pct_of_total ?? 0), 0))
 const share20 = computed(() => top50.value.slice(0, 20).reduce((s, x) => s + (x.pct_of_total ?? 0), 0))
@@ -113,8 +120,46 @@ const concOpt = computed(() =>
     <p class="page-desc">资金结构视角：前50名成交排名 + 分层占比 · 判断龙头集中 / 资金扩散 / 普遍活跃</p>
 
     <template v-if="conc && daily">
-      <!-- 三个辅助指标 -->
-      <div class="card-grid cols-3">
+      <!-- ① Top50 成交排名柱状图 -->
+      <div class="card" style="margin-top:14px">
+        <div class="card-title">📊 Top50 成交排名（按成交额降序 · 1-10核心/11-20次核心/21-50普通）</div>
+        <ChartPanel :option="top50Opt" height="320px" />
+      </div>
+
+      <!-- ② Top50 个股排名表 -->
+      <div class="card" style="margin-top:14px">
+        <div class="card-title">📋 Top50 成交额个股排名</div>
+        <div class="table-wrap" style="margin-top:8px">
+          <table class="data">
+            <thead>
+              <tr>
+                <th style="width:50px">排名</th>
+                <th>股票代码</th>
+                <th>股票名称</th>
+                <th class="num" style="width:110px">成交额(亿元)</th>
+                <th class="num" style="width:110px">占市场成交</th>
+                <th>行业</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, i) in top50" :key="row.code">
+                <td>
+                  <span class="rank-dot" :style="{ background: rankColor(i + 1) }"></span>
+                  {{ i + 1 }}
+                </td>
+                <td class="num">{{ row.code }}</td>
+                <td>{{ row.name }}</td>
+                <td class="num">{{ fmt(row.amount) }}</td>
+                <td class="num">{{ row.pct_of_total ?? 0 }}%</td>
+                <td>{{ industryText(row) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ③ Top10/20/50 集中度卡片 -->
+      <div class="card-grid cols-3" style="margin-top:14px">
         <div class="card">
           <div class="card-title">🔴 核心资金区 Top10</div>
           <div class="card-value num">{{ fmt(share10) }}<span class="unit">%</span></div>
@@ -135,13 +180,7 @@ const concOpt = computed(() =>
         </div>
       </div>
 
-      <!-- Top50 成交排名柱状图 -->
-      <div class="card" style="margin-top:14px">
-        <div class="card-title">📊 Top50 成交排名（按成交额降序 · 1-10核心/11-20次核心/21-50普通）</div>
-        <ChartPanel :option="top50Opt" height="320px" />
-      </div>
-
-      <!-- 头部抱团度历史折线 -->
+      <!-- ④ 头部抱团度历史折线 -->
       <div class="card" style="margin-top:14px">
         <div class="card-title">🧲 头部抱团度（前10成交占比 %，近120个交易日）</div>
         <ChartPanel v-if="ready && nAll >= 30" :option="concOpt" height="240px" />
@@ -154,3 +193,14 @@ const concOpt = computed(() =>
     </div>
   </div>
 </template>
+
+<style scoped>
+.rank-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+</style>
