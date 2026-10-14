@@ -63,8 +63,11 @@ def test_parse_tencent_quote_rejects_abnormal_amount():
 
 
 def test_tencent_index_amount_not_enabled_returns_none():
-    """未在 _TENCENT_ENABLED 中的代码不应走腾讯通道。"""
-    amount = index_mod._tencent_index_amount("sz399673", "20261009")
+    """未在 _TENCENT_ENABLED 中的代码不应走腾讯通道。
+    注意：sz399673 已在 a82be23 加入白名单，故改用明确不在白名单内的 sh000999 作哨兵，
+    既验证白名单过滤逻辑，又避免测试依赖真实网络。"""
+    assert "sh000999" not in index_mod._TENCENT_ENABLED
+    amount = index_mod._tencent_index_amount("sh000999", "20261009")
     assert amount is None
 
 
