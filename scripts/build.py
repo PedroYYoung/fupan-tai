@@ -265,8 +265,14 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
         r["pctile_all"] = compute.pctile(svals, r["amount"])
 
     # ---- 指数观察（YTD + 本周/本月/年内均额 + 较昨日变化）----
+    # idx_rows 与 wide_rows 可能包含同一指数（如科创50 同为主要指数与宽基成分），
+    # 按 code 去重，避免 index_observation 出现重复行（前端 obsMap 虽按 code 覆盖，仍保持数据整洁）。
     index_observation = []
+    _seen_obs = set()
     for r in idx_rows + wide_rows:
+        if r["code"] in _seen_obs:
+            continue
+        _seen_obs.add(r["code"])
         index_observation.append({
             "code": r["code"], "name": r["name"],
             "ytd_pct": index_mod.get_index_ytd_pct(r["code"], date, dates),
