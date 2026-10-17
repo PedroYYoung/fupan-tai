@@ -91,7 +91,7 @@ function subText(agg: { rank: number | null; rankYear: number | null; sampleN: n
 
       <div class="card">
         <div class="card-title">🏦 两融余额</div>
-        <div class="card-desc">沪市+深市汇总（亿元）· 数据延迟约1日</div>
+        <div class="card-desc">沪市+深市汇总（亿元）<template v-if="store.daily?.overview.margin_date"> · 统计日期 {{ store.formatDay(store.daily.overview.margin_date) }}</template></div>
         <div class="card-value num">{{ fmt(mgAgg.value) }}<span class="unit">亿</span></div>
         <div class="card-sub num">{{ subText(mgAgg, mgAgg.sampleN) }}</div>
         <span v-if="mgAgg.sampleN >= 30" class="card-sample num">样本N={{ mgAgg.sampleN }}</span>

@@ -42,6 +42,13 @@ function fmt(n: number | null | undefined, digits = 1): string {
   return n.toLocaleString('zh-CN', { maximumFractionDigits: digits, minimumFractionDigits: digits })
 }
 
+/** 「128（+4）」：数量 + 较上一交易日变化；缺上一交易日变化时显示「128（—）」 */
+function countText(count: number, delta: number | null | undefined): string {
+  if (delta == null) return `${count}（—）`
+  const s = delta > 0 ? `+${delta}` : String(delta)
+  return `${count}（${s}）`
+}
+
 // 统一市值档位颜色
 const MKTCAP_COLORS: Record<string, string> = {
   '1000亿以上': '#8B0000',
@@ -192,7 +199,7 @@ const stackOpt = computed<EChartsOption | null>(() => {
 <template>
   <div class="page">
     <h1 class="page-title">📐 流动性结构 · <span class="num">{{ daily ? store.formatDay(daily.trade_date) : '—' }}</span></h1>
-    <p class="page-desc">10亿以上活跃家数 + 成交额结构 + 活跃股市值结构 + 市值 6 档结构</p>
+    <p class="page-desc">10亿以上活跃家数 + 成交额结构 + 活跃股市值结构 + 市值 6 档结构 · 各表格「股票数量」括号内为较上一交易日变化</p>
 
     <template v-if="liq && daily">
       <div class="card-grid cols-4">
@@ -224,7 +231,7 @@ const stackOpt = computed<EChartsOption | null>(() => {
             <thead><tr><th>成交额区间</th><th>股票数量</th><th>占全市场比例</th></tr></thead>
             <tbody>
               <tr v-for="b in amountBuckets" :key="b.label">
-                <td>{{ b.label }}</td><td class="num">{{ b.count }}</td><td class="num">{{ b.pct }}%</td>
+                <td>{{ b.label }}</td><td class="num">{{ countText(b.count, b.count_change) }}</td><td class="num">{{ b.pct }}%</td>
               </tr>
             </tbody>
           </table>
@@ -249,7 +256,7 @@ const stackOpt = computed<EChartsOption | null>(() => {
             <tbody>
               <tr v-for="b in mcapCountBuckets" :key="b.label">
                 <td><span class="dot" :style="{ background: MKTCAP_COLORS[b.label] }"></span>{{ b.label }}</td>
-                <td class="num">{{ b.count }}</td><td class="num">{{ b.pct }}%</td>
+                <td class="num">{{ countText(b.count, b.count_change) }}</td><td class="num">{{ b.pct }}%</td>
               </tr>
             </tbody>
           </table>
@@ -266,7 +273,7 @@ const stackOpt = computed<EChartsOption | null>(() => {
             <tbody>
               <tr v-for="b in mcapValueBuckets" :key="b.label">
                 <td><span class="dot" :style="{ background: MKTCAP_COLORS[b.label] }"></span>{{ b.label }}</td>
-                <td class="num">{{ b.count }}</td>
+                <td class="num">{{ countText(b.count, b.count_change) }}</td>
                 <td class="num">{{ fmt(b.total_value, 0) }}</td>
                 <td class="num">{{ b.pct }}%</td>
               </tr>

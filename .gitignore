@@ -10,3 +10,5 @@ public/data/meta/last_error.log
 .vercel
 vite.config.ts.timestamp-*.mjs
 scripts/_cache/
+.pytest_tmp/
+.pytest_cache/

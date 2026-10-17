@@ -24,6 +24,16 @@ function signPct(n: number | null | undefined): string {
   if (n == null) return '—'
   return (n > 0 ? '+' : '') + fmt(n, 2) + '%'
 }
+/** 较上一交易日变化：缺失返回「（—）」；成交额/均额用金额差，百分比用百分点差 */
+function deltaText(v: number | null | undefined, digits = 2): string {
+  if (v == null) return '（—）'
+  const s = v > 0 ? '+' + fmt(v, digits) : fmt(v, digits)
+  return `（${s}）`
+}
+function deltaClass(v: number | null | undefined): string {
+  if (v == null) return 'muted'
+  return v > 0 ? 'up' : v < 0 ? 'down' : 'muted'
+}
 function pctClass(n: number | null | undefined): string {
   if (n == null) return 'muted'
   return n > 0 ? 'up' : n < 0 ? 'down' : 'muted'
@@ -75,7 +85,7 @@ const compareOpt = computed<EChartsOption | null>(() => {
 <template>
   <div class="page">
     <h1 class="page-title">📊 指数观察 · <span class="num">{{ daily ? store.formatDay(daily.trade_date) : '—' }}</span></h1>
-    <p class="page-desc">主要指数成交额 + 年内涨跌幅 + 本周/本月/年内均额</p>
+    <p class="page-desc">主要指数成交额 + 年内涨跌幅 + 本周/本月/年内均额 · 括号内为较上一交易日变化（成交额/均额为亿元差，涨跌幅为百分点差）</p>
 
     <div v-if="daily" class="card" style="margin-top:14px">
       <div class="table-wrap">
@@ -94,13 +104,13 @@ const compareOpt = computed<EChartsOption | null>(() => {
           <tbody>
             <tr v-for="r in idxRows" :key="r.code">
               <td>{{ r.name }} <span v-if="r.approx" class="muted" style="font-size:11px">（近似值）</span></td>
-              <td class="num">{{ fmt(r.amount, 2) }}</td>
+              <td class="num">{{ fmt(r.amount, 2) }}<span class="muted" :class="deltaClass(r.amount_change)">{{ deltaText(r.amount_change, 2) }}</span></td>
               <td class="num" :class="pctClass(obsMap.get(r.code)?.ytd_pct)">
-                {{ signPct(obsMap.get(r.code)?.ytd_pct) }}
+                {{ signPct(obsMap.get(r.code)?.ytd_pct) }}<span class="muted" :class="deltaClass(obsMap.get(r.code)?.ytd_pct_change)">{{ deltaText(obsMap.get(r.code)?.ytd_pct_change, 2) }}</span>
               </td>
-              <td class="num">{{ fmt(obsMap.get(r.code)?.avg_week_amount, 2) }}</td>
-              <td class="num">{{ fmt(obsMap.get(r.code)?.avg_month_amount, 2) }}</td>
-              <td class="num">{{ fmt(obsMap.get(r.code)?.avg_year_amount, 2) }}</td>
+              <td class="num">{{ fmt(obsMap.get(r.code)?.avg_week_amount, 2) }}<span class="muted" :class="deltaClass(obsMap.get(r.code)?.avg_week_change)">{{ deltaText(obsMap.get(r.code)?.avg_week_change, 2) }}</span></td>
+              <td class="num">{{ fmt(obsMap.get(r.code)?.avg_month_amount, 2) }}<span class="muted" :class="deltaClass(obsMap.get(r.code)?.avg_month_change)">{{ deltaText(obsMap.get(r.code)?.avg_month_change, 2) }}</span></td>
+              <td class="num">{{ fmt(obsMap.get(r.code)?.avg_year_amount, 2) }}<span class="muted" :class="deltaClass(obsMap.get(r.code)?.avg_year_change)">{{ deltaText(obsMap.get(r.code)?.avg_year_change, 2) }}</span></td>
               <td class="num">{{ r.pctile_all != null ? r.pctile_all + '%' : '—' }}</td>
             </tr>
           </tbody>

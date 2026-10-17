@@ -26,7 +26,10 @@ function rankCls(v: number): string {
 <template>
   <div class="page">
     <h1 class="page-title">🏭 行业 · <span class="num">{{ daily ? store.formatDay(daily.trade_date) : '—' }}</span></h1>
-    <p class="page-desc">东财行业板块当日涨跌 TOP10 · 成交额与占两市比</p>
+    <p class="page-desc">行业板块当日涨跌 TOP10 · 成交额与占两市比（东财 → 同花顺备用源）</p>
+    <p v-if="industry?.note" class="muted" style="font-size:12px; margin-top:2px">
+      {{ industry.note }}<template v-if="industry?.as_of"> · 数据日期 {{ store.formatDay(industry.as_of) }}</template>
+    </p>
 
     <template v-if="industry">
       <div class="card-grid cols-2">
@@ -100,9 +103,8 @@ function rankCls(v: number): string {
       <div class="card" style="margin-top:14px">
         <div class="card-title">📖 口径说明</div>
         <ul class="muted" style="font-size:12px; margin:8px 0 0 18px; line-height:1.9">
-          <li>当日数据口径：<strong>东财行业板块</strong>（stock_board_industry_name_em），成交额单位亿元，占两市比 = 板块成交额 / 两市总成交额。</li>
-          <li>历史序列由<strong>中证/申万指数体系</strong>回填；严格申万二级成分映射需要「东财行业 ↔ 申万二级」对齐表 CSV（V2 扩展点），
-              提供 CSV 后运行 <code>python scripts/build.py --industry-backfill 对齐表.csv</code> 即可回填近一年。</li>
+          <li>当日数据口径：<strong>东财行业板块</strong>（stock_board_industry_name_em）为主源，失败时降级<strong>同花顺行业板块</strong>（stock_board_industry_summary_ths，独立通道）；成交额单位亿元，占两市比 = 板块成交额 / 两市总成交额。</li>
+          <li>两源均失败时继承上一交易日有效数据，并在此页顶部标注真实数据日期，不把旧数据伪装成当日。</li>
           <li>板块成交额与个股成交额加总存在口径差异（板块含成分调整时滞），仅作结构参考。</li>
         </ul>
       </div>

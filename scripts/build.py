@@ -53,6 +53,19 @@ def _previous_trade_day(date: str, dates: list) -> str | None:
     return dates[i - 1] if i > 0 else None
 
 
+def _load_daily(date: str):
+    """读取 daily/{date}.json 全量快照；不存在或损坏返回 None"""
+    import json
+    p = os.path.join(DATA_DIR, "daily", f"{date}.json")
+    if not os.path.exists(p):
+        return None
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _load_industry_from_daily(date: str):
     """从指定日期的 daily 文件中读取 industry 字段。"""
     import json
@@ -98,8 +111,10 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
         def make_row(code: str, base_approx: bool):
             amt, amt_date, note = index_mod.get_index_amount_resilient(
                 code, d, last_known_point(code))
+            chg = index_mod.get_index_change_pct(code, d)
             return {"name": index_mod.INDEX_CODES[code], "code": code,
                     "amount": amt, "amount_date": amt_date, "note": note,
+                    "change_pct": chg, "amount_change": None,
                     "rank_year": None, "rank_1y": None, "pctile_all": None,
                     "approx": (base_approx and amt is not None) or note != ""}
 
@@ -108,18 +123,38 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
         for code in ["sh000016", "sh000300", "sz399673", "sh000688", "sh000905",
                      "sh000906", "sh000852", "sh932000", "sh000985", "hstech_513180"]:
             rows_wide.append(make_row(code, code == "hstech_513180"))
-        # 微盘代理：第 11 格
+        # 微盘代理：第 11 格（前端宽基矩阵已不展示，但保留底层序列与数据）
         micro_amt, micro_n = compute.microcap_proxy_amount(spot_df)
         rows_wide.append({"name": "微盘代理(自建)", "code": "micro_proxy",
                           "amount": micro_amt, "amount_date": date, "note": "",
+                          "change_pct": None, "amount_change": None,
                           "rank_1y": None, "pctile_all": None, "approx": False})
         log(f"微盘代理：市值后10%（N={micro_n}）等权日均成交 {micro_amt} 亿")
         return rows_idx, rows_wide
 
     idx_rows, wide_rows = fetch_index_rows(date)
 
-    # ---- 两融 ----
-    margin = margin_mod.get_margin(date)
+    # ---- 加载上一交易日快照（用于「较昨日变化」与流动性数量变化）----
+    prev_daily = None
+    prev_date = _previous_trade_day(date, dates)
+    if prev_date:
+        prev_daily = _load_daily(prev_date)
+
+    def _delta(cur, prev_v):
+        """当前值与上一交易日值的差；任一侧缺失返回 None（不按 0 计）"""
+        if cur is None or prev_v is None:
+            return None
+        return round(cur - prev_v, 2)
+
+    if prev_daily:
+        prev_idx = {}
+        for r in (prev_daily.get("index_volume") or []) + (prev_daily.get("widebase") or []):
+            prev_idx[r["code"]] = r.get("amount")
+        for r in idx_rows + wide_rows:
+            r["amount_change"] = _delta(r.get("amount"), prev_idx.get(r["code"]))
+
+    # ---- 两融（T+1 发布，返回 (余额亿元, 实际统计日期)）----
+    margin, margin_date = margin_mod.get_margin(date)
 
     # ---- 涨跌停 ----
     limit_up, limit_down, lu10, ld10 = zt_mod.get_limit_pools(date, spot_df)
@@ -129,14 +164,18 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
     over_cnt, over_ratio, stock_count = compute.over_10e(spot_df)
     conc = compute.concentration(spot_df)
 
-    # ---- 行业板块（东财行业当日涨跌TOP10）----
+    # ---- 行业板块（东财 → 同花顺，当日涨跌TOP10）----
     industry = industry_mod.get_industry_daily(total_amount)
     if industry is None:
-        # 东财行业失败：尝试继承上一交易日数据（保证页面不空），并记录原因
+        # 两个数据源均失败：继承上一交易日有效数据，并标明真实数据日期（不伪装当日）
         prev = _previous_trade_day(date, dates)
         if prev:
-            industry = _load_industry_from_daily(prev)
-            if industry:
+            inherited = _load_industry_from_daily(prev)
+            if inherited:
+                inherited = dict(inherited)
+                inherited["note"] = f"口径：继承自上一交易日 {prev}（当日数据源失败）"
+                inherited["as_of"] = prev
+                industry = inherited
                 log(f"行业板块继承自上一交易日 {prev}")
         if industry is None:
             log(f"行业板块 {date} 获取失败且无前值可继承，置为空")
@@ -145,7 +184,8 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
         "total_amount": total_amount,
         "total_amount_rank_year": None, "total_amount_rank_all": None,
         "total_amount_pctile_all": None,
-        "margin_balance": margin, "margin_rank_year": None, "margin_pctile_all": None,
+        "margin_balance": margin, "margin_date": margin_date,
+        "margin_rank_year": None, "margin_pctile_all": None,
         "limit_up": limit_up, "limit_down": limit_down,
         "over_10e_count": over_cnt, "over_10e_ratio": over_ratio,
         "stock_count": stock_count,
@@ -161,8 +201,9 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
     year_vals = [p["value"] for p in pts if p["date"].startswith(date[:4])]
     overview["total_amount_rank_year"] = compute.rank_of(year_vals, total_amount) if year_vals else None
 
-    if margin is not None:
-        compute.update_series("margin", "两融余额", "亿元", date, margin)
+    if margin is not None and margin_date is not None:
+        # 按「实际统计日期」写入序列（两融 T+1，实际日期可能早于当日）
+        compute.update_series("margin", "两融余额", "亿元", margin_date, margin)
         mvals = series_values("margin")
         overview["margin_rank_year"] = compute.rank_of(mvals, margin)
         overview["margin_pctile_all"] = compute.pctile(mvals, margin)
@@ -186,10 +227,12 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
             compute.update_series(key, r["name"], "亿元", date, r["amount"])
         svals = series_values(key)
         if r.get("rank_1y") is None:
-            r["rank_1y"] = compute.rank_of(svals, r["amount"])
+            # 近一年排名 = 最近 244 个交易日窗口内的降序排位（与 series 内 rank_1y、
+            # 前端 oneYearSampleN() 的 244 窗口口径一致；全历史排名另用 rank_all）
+            r["rank_1y"] = compute.rank_of(svals[-244:], r["amount"])
         r["pctile_all"] = compute.pctile(svals, r["amount"])
 
-    # ---- 指数观察（YTD + 本周/本月/年内均额）----
+    # ---- 指数观察（YTD + 本周/本月/年内均额 + 较昨日变化）----
     index_observation = []
     for r in idx_rows + wide_rows:
         index_observation.append({
@@ -199,6 +242,16 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
             "avg_month_amount": compute.avg_index_amount(r["code"], date, dates, "month"),
             "avg_year_amount": compute.avg_index_amount(r["code"], date, dates, "year"),
         })
+    prev_obs = {}
+    if prev_daily:
+        for o in prev_daily.get("index_observation") or []:
+            prev_obs[o["code"]] = o
+    for o in index_observation:
+        po = prev_obs.get(o["code"])
+        o["ytd_pct_change"] = _delta(o["ytd_pct"], po.get("ytd_pct")) if po else None
+        o["avg_week_change"] = _delta(o["avg_week_amount"], po.get("avg_week_amount")) if po else None
+        o["avg_month_change"] = _delta(o["avg_month_amount"], po.get("avg_month_amount")) if po else None
+        o["avg_year_change"] = _delta(o["avg_year_amount"], po.get("avg_year_amount")) if po else None
 
     # ---- 行业周涨跌排名 ----
     industry_week_rank = industry_mod.get_industry_week_rank(date, dates)
@@ -220,6 +273,24 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
     down_map = {p["date"]: p["value"] for p in lud_down}
     spark_lud = [{"date": p["date"], "up": p["value"], "down": down_map.get(p["date"], 0)} for p in lud]
 
+    # ---- 流动性结构：三个分档表「较昨日股票数量变化」----
+    # 同一分档口径（成交额门槛/市值分档/区间边界）取上一交易日快照中的 count，
+    # 缺上一交易日 → count_change=None（前端显示「—」），绝不按 0 计。
+    def _attach_count_change(buckets, prev_buckets):
+        pmap = {b["label"]: b.get("count") for b in (prev_buckets or [])}
+        for b in buckets:
+            p = pmap.get(b["label"])
+            b["count_change"] = (b["count"] - p) if p is not None else None
+        return buckets
+
+    prev_liq = (prev_daily or {}).get("liquidity") or {}
+    amount_buckets = _attach_count_change(
+        compute.amount_buckets(spot_df), prev_liq.get("amount_buckets"))
+    o10e_mc_buckets = _attach_count_change(
+        compute.over_10e_marketcap_buckets(spot_df), prev_liq.get("over_10e_marketcap_buckets"))
+    o10e_mc_value_buckets = _attach_count_change(
+        compute.over_10e_marketcap_value_buckets(spot_df), prev_liq.get("over_10e_marketcap_value_buckets"))
+
     daily = {
         "trade_date": date,
         "overview": overview,
@@ -235,9 +306,9 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
             "over_10e_count": over_cnt, "over_10e_ratio": over_ratio,
             "pctile_count": compute.pctile(series_values("over_10e_count"), over_cnt),
             "mktcap_buckets": compute.mktcap_buckets(spot_df),
-            "amount_buckets": compute.amount_buckets(spot_df),
-            "over_10e_marketcap_buckets": compute.over_10e_marketcap_buckets(spot_df),
-            "over_10e_marketcap_value_buckets": compute.over_10e_marketcap_value_buckets(spot_df),
+            "amount_buckets": amount_buckets,
+            "over_10e_marketcap_buckets": o10e_mc_buckets,
+            "over_10e_marketcap_value_buckets": o10e_mc_value_buckets,
         },
         "emotion": {
             "limit_up": limit_up, "limit_down": limit_down,

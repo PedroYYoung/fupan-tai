@@ -406,7 +406,7 @@ def stage_snapshot():
     with open(os.path.join(CACHE, "stocks_agg.pkl"), "rb") as f:
         agg = pickle.load(f)
 
-    # ---- 腾讯总市值 + 全市场成交额（微盘代理用）+ 自选股行情 ----
+    # ---- 腾讯总市值 + 全市场成交额（微盘代理用）----
     s = requests.Session()
     s.trust_env = False
     all_codes = [c.replace(".", "") for c in agg["done"]]  # sh.600000 → sh600000
@@ -431,22 +431,6 @@ def stage_snapshot():
             except ValueError:
                 continue
     log(f"腾讯总市值 {len(tx_map)} 只")
-
-    # 自选股 quotes.json
-    with open(os.path.join(DATA_DIR, "stocks.json"), encoding="utf-8") as f:
-        watch = json.load(f).get("stocks", [])
-    wl = []
-    for w in watch:
-        c = w["code"]
-        pre = "sh" if c.startswith("6") else ("sz" if c.startswith(("0", "3")) else "bj")
-        wl.append(pre + c)
-    quotes = []
-    for q in _tencent_batch(s, wl):
-        quotes.append({"code": q["code"], "name": q["name"],
-                       "price": q["price"], "change": q["change"]})
-    atomic_write_json(os.path.join(DATA_DIR, "quotes.json"),
-                      {"date": f"{target[:4]}-{target[4:6]}-{target[6:]}", "quotes": quotes})
-    log(f"quotes.json：{len(quotes)} 只")
 
     # ---- 概览 ----
     total_amount = round(idx["sh000001"][target] + idx["sz399001"][target], 2)

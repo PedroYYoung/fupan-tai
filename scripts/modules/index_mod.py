@@ -375,6 +375,60 @@ def _bs_login():
         _BS_LOGGED = bool(bs.login())
 
 
+def _tencent_change_pct(code: str, date: str):
+    """腾讯行情当日涨跌幅（f[32]），严格校验行情日期；失败返回 None"""
+    if code not in _TENCENT_ENABLED:
+        return None
+    try:
+        r = requests.get(f"https://qt.gtimg.cn/q={_tencent_code(code)}",
+                         headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+        r.encoding = "gbk"
+        prefix = f'v_{_tencent_code(code)}="'
+        for line in r.text.split(";"):
+            line = line.strip()
+            if not line.startswith(prefix):
+                continue
+            f = line[len(prefix):].rstrip('"').split("~")
+            if len(f) < 33:
+                return None
+            ts = f[30].strip()
+            if not ts or ts[:8] != date:
+                return None
+            raw = f[32].strip()
+            if not raw or raw == "-":
+                return None
+            try:
+                return round(float(raw), 2)
+            except ValueError:
+                return None
+    except Exception as e:  # noqa: BLE001
+        log(f"腾讯涨跌幅 {code} {date} 失败：{e}")
+    return None
+
+
+def get_index_change_pct(code: str, date: str):
+    """当日涨跌幅（%）；失败返回 None。
+
+    baostock pctChg 为主（CI 可用、可查任意历史日期）；腾讯 f[32] 为备（仅当日）。
+    """
+    try:
+        import baostock as bs
+        _bs_login()
+        rs = bs.query_history_k_data_plus(
+            _bs_code(code), "date,pctChg", start_date=_bs_date(date), end_date=_bs_date(date),
+            frequency="d", adjustflag="3")
+        if rs is not None and rs.error_code == "0":
+            while rs.next():
+                row = rs.get_row_data()
+                try:
+                    return round(float(row[1]), 2)
+                except (TypeError, ValueError):
+                    return None
+    except Exception as e:  # noqa: BLE001
+        log(f"指数涨跌幅 {code} {date} baostock 失败：{e}")
+    return _tencent_change_pct(code, date)
+
+
 def get_index_close(code: str, date: str):
     """使用 baostock 获取指数/ETF 指定交易日收盘价；失败返回 None"""
     _bs_login()

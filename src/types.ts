@@ -17,6 +17,8 @@ export interface Overview {
   total_amount_rank_all: number | null
   total_amount_pctile_all: number | null
   margin_balance: number | null
+  /** 两融余额的实际统计日期（T+1 发布，可能早于 trade_date） */
+  margin_date?: string | null
   margin_rank_year: number | null
   margin_pctile_all: number | null
   limit_up: number
@@ -35,6 +37,10 @@ export interface IndexRow {
   amount_date?: string | null
   /** 取数说明：'' 当日真实值 / 'last_trading_day' 取自最近交易日 / 'etf_proxy' ETF 代理 */
   note?: string | null
+  /** 当日涨跌幅（%）；无可用行情源时为 null */
+  change_pct?: number | null
+  /** 成交额较上一交易日的差值（亿）；任一侧缺失为 null */
+  amount_change?: number | null
   rank_year: number | null
   rank_1y: number | null
   pctile_all: number | null
@@ -58,6 +64,8 @@ export interface ValueBucket {
   count: number
   total_value: number
   pct: number
+  /** 股票数量较上一交易日的差值；缺上一交易日为 null */
+  count_change?: number | null
 }
 
 export interface IndexObservation {
@@ -67,6 +75,11 @@ export interface IndexObservation {
   avg_week_amount: number | null
   avg_month_amount: number | null
   avg_year_amount: number | null
+  /** 较上一交易日的差值（百分比指标为百分点差，均额为金额差） */
+  ytd_pct_change?: number | null
+  avg_week_change?: number | null
+  avg_month_change?: number | null
+  avg_year_change?: number | null
 }
 
 export interface StockRow {
@@ -86,6 +99,8 @@ export interface Bucket {
   label: string
   count: number
   pct: number
+  /** 股票数量较上一交易日的差值；缺上一交易日为 null */
+  count_change?: number | null
 }
 
 export interface Concentration {
@@ -169,6 +184,12 @@ export interface DailyData {
   industry?: {
     top10_up: IndustryRow[]
     top10_down: IndustryRow[]
+    /** 数据源：eastmoney / ths */
+    source?: string
+    /** 口径说明 */
+    note?: string
+    /** 继承场景下的真实数据日期 */
+    as_of?: string
   }
   concentration: Concentration
   liquidity: {

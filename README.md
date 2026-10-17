@@ -15,7 +15,6 @@
 ```bash
 npm install && npm run dev      # http://localhost:5173
 python scripts/build.py --date 20260925   # 真实建仓（需 pip install -r scripts/requirements.txt）
-python scripts/make_sample_data.py        # 重新生成内置演示数据
 python scripts/make_icons.py              # 重新生成 PWA 图标
 ```
 
@@ -23,7 +22,7 @@ python scripts/make_icons.py              # 重新生成 PWA 图标
 
 ## public/data/ 目录结构（统一数据根）
 
-**单一数据架构**：所有 JSON 数据只存在于 `public/data/` 一处——Vite dev 直接托管为 `/data/*`，构建时随 `dist/` 发布，Vercel/本地/CI 三端同构，无第二份拷贝、无同步步骤。数据管线（`build.py` / `update_data.py`）也直接写入此处。
+**单一数据架构**：所有 JSON 数据只存在于 `public/data/` 一处——Vite dev 直接托管为 `/data/*`，构建时随 `dist/` 发布，Vercel/本地/CI 三端同构，无第二份拷贝、无同步步骤。数据管线（`build.py`）也直接写入此处。
 
 ```
 public/data/
@@ -31,12 +30,9 @@ public/data/
 ├── meta/last_error.log         # 构建失败记录（成功时不生成，gitignore）
 ├── latest.json                 # {latest: "20260925", updated_at}
 ├── daily/YYYYMMDD.json         # 每日快照（overview/index_volume/widebase/concentration/liquidity/emotion + sparklines）
-├── series/*.json               # 历史序列（total_amount/margin/limit_up_down/over_10e_count/index_amount_* 等），含预计算 rank/pctile
-├── stocks.json                 # 自选股清单（手动维护）：{"stocks":[{"code":"000001","name":"平安银行"}]}
-└── quotes.json                 # 自选股行情快照（scripts/update_data.py 生成）：{"date":"YYYY-MM-DD","quotes":[{code,name,price,change}]}
+└── series/*.json               # 历史序列（total_amount/margin/limit_up_down/over_10e_count/index_amount_* 等），含预计算 rank/pctile
 ```
 
-- 主数据（daily/series/meta）与自选股行情（quotes.json）**解耦**：主数据按交易日 YYYYMMDD 组织、由 `build.py` 每日收盘后更新；quotes 按自然日 YYYY-MM-DD、可在盘中/收盘多次更新，前端 store 中分别管理、独立失败互不影响。
 - **扩展约定**（V2）：个股 K 线/历史走势放 `public/data/quotes/kline_{code}.json`，技术指标放 `series/indicator_*.json`，复盘记录沿用 `notesdb`（IndexedDB）或 `daily/` 扩展字段——均无需改动现有结构。
 
 金额单位统一「亿元」；百分比为数值（8.5 表示 8.5%）；日期 YYYYMMDD 字符串；null 表示缺失而非 0。

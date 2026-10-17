@@ -2,9 +2,9 @@ name: update-data
 
 on:
   schedule:
-    # UTC 07:00 = 北京时间 15:00（收盘）：更新自选股行情 quotes.json
+    # UTC 07:00 = 北京时间 15:00：午后增量（可捕获两融等 T+1 发布的数据）
     - cron: '0 7 * * 1-5'
-    # UTC 11:30 = 北京时间 19:30（收盘后）：全量增量数据 + 自选股行情兜底
+    # UTC 11:30 = 北京时间 19:30（收盘后）：全量增量数据
     - cron: '30 11 * * *'
   workflow_dispatch:
     inputs:
@@ -75,10 +75,6 @@ jobs:
             python scripts/build.py --incremental --backfill-days "$BF" || true
           fi
           python scripts/build.py --incremental
-
-      # 自选股行情（quotes.json）：读取 public/data/stocks.json 清单
-      - name: Update quotes
-        run: python scripts/update_data.py
 
       - name: Commit & push
         run: |

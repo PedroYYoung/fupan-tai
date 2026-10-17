@@ -12,9 +12,6 @@ pip install -r requirements.txt
 python scripts/build.py --date 20260925        # 指定交易日
 python scripts/build.py --incremental          # 最近已收盘交易日
 python scripts/build.py --date 20260925 --backfill-days 20   # 本地回补（勿在 CI 用）
-
-# 演示数据（仓库已内置，可跳过）
-python scripts/make_sample_data.py
 ```
 
 ## 2. Vercel 导入步骤

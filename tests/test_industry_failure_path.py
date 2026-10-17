@@ -11,12 +11,33 @@ from modules import industry_mod
 
 
 def test_industry_module_returns_none_on_failure(monkeypatch):
-    """行业接口异常时应返回 None，而不是抛异常或返回空列表。"""
+    """东财与同花顺均异常时应返回 None，而不是抛异常或返回空列表。"""
     import akshare as ak
     monkeypatch.setattr(ak, "stock_board_industry_name_em",
                         lambda *a, **k: (_ for _ in ()).throw(ConnectionError("东财挂了")))
+    monkeypatch.setattr(ak, "stock_board_industry_summary_ths",
+                        lambda *a, **k: (_ for _ in ()).throw(ConnectionError("同花顺挂了")))
     result = industry_mod.get_industry_daily(total_amount=10000.0)
     assert result is None
+
+
+def test_industry_falls_back_to_ths_when_em_fails(monkeypatch):
+    """东财失败时应降级到同花顺，并标注 source=ths 而非返回 None。"""
+    import akshare as ak
+    import pandas as pd
+    monkeypatch.setattr(ak, "stock_board_industry_name_em",
+                        lambda *a, **k: (_ for _ in ()).throw(ConnectionError("东财挂了")))
+    ths_df = pd.DataFrame({
+        "板块": ["银行", "半导体"],
+        "涨跌幅": [1.5, -0.8],
+        "总成交额": [320.0, 180.0],
+    })
+    monkeypatch.setattr(ak, "stock_board_industry_summary_ths", lambda *a, **k: ths_df)
+    result = industry_mod.get_industry_daily(total_amount=10000.0)
+    assert result is not None
+    assert result["source"] == "ths"
+    assert result["top10_up"][0]["name"] == "银行"
+    assert result["top10_down"][0]["name"] == "半导体"
 
 
 def test_build_inherits_industry_from_previous_day(monkeypatch, tmp_path):
@@ -47,7 +68,7 @@ def test_build_inherits_industry_from_previous_day(monkeypatch, tmp_path):
     monkeypatch.setattr(build_main.spot_mod, "get_spot",
                         lambda d: _make_min_spot_df())
     monkeypatch.setattr(build_main.index_mod, "get_index_amount", lambda c, d: None)
-    monkeypatch.setattr(build_main.margin_mod, "get_margin", lambda d: None)
+    monkeypatch.setattr(build_main.margin_mod, "get_margin", lambda d: (None, None))
     monkeypatch.setattr(build_main.zt_mod, "get_limit_pools", lambda d, spot: (0, 0, [], []))
     monkeypatch.setattr(build_main.compute, "microcap_proxy_amount", lambda spot: (0.0, 0))
     monkeypatch.setattr(build_main.compute, "over_10e", lambda spot: (0, 0.0, 0))
@@ -66,7 +87,11 @@ def test_build_inherits_industry_from_previous_day(monkeypatch, tmp_path):
 
     with open(daily_dir / f"{target_date}.json", encoding="utf-8") as f:
         daily = json.load(f)
-    assert daily["industry"] == prev_industry
+    # 继承上一交易日数据 + 标注真实数据日期，不得伪装成当日
+    assert daily["industry"]["top10_up"] == prev_industry["top10_up"]
+    assert daily["industry"]["top10_down"] == prev_industry["top10_down"]
+    assert daily["industry"]["as_of"] == prev_date
+    assert "继承" in daily["industry"]["note"]
 
 
 def _make_min_spot_df():
