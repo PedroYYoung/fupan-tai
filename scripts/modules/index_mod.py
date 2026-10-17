@@ -429,46 +429,107 @@ def get_index_change_pct(code: str, date: str):
     return _tencent_change_pct(code, date)
 
 
+# ------------------------------------------------------------------
+# 新浪指数日线（baostock 不覆盖科创50/北证50/中证全指等时的历史收盘兜底）
+# ------------------------------------------------------------------
+_SINA_CACHE = {}
+
+
+def _sina_daily(code: str) -> dict:
+    """新浪指数日线 {YYYYMMDD: close}；失败返回 {}（进程内缓存）。"""
+    if code in _SINA_CACHE:
+        return _SINA_CACHE[code]
+    out = {}
+    try:
+        import akshare as ak
+        df = ak.stock_zh_index_daily(symbol=code)
+        for _, r in df.iterrows():
+            d = str(r.get("date")).replace("-", "").strip()
+            try:
+                out[d] = float(r["close"])
+            except (TypeError, ValueError):
+                continue
+    except Exception as e:  # noqa: BLE001
+        log(f"新浪指数日线 {code} 失败：{e}")
+    _SINA_CACHE[code] = out
+    return out
+
+
+def _sina_close(code: str, date: str) -> float | None:
+    return _sina_daily(code).get(date)
+
+
 def get_index_close(code: str, date: str):
-    """使用 baostock 获取指数/ETF 指定交易日收盘价；失败返回 None"""
+    """获取指数/ETF 指定交易日收盘价；baostock → 新浪，均失败返回 None。
+
+    baostock 不覆盖科创50(sh000688)/北证50(bj899050)/中证全指(sh000985)等，
+    这些代码由新浪通道兜底。
+    """
     _bs_login()
     import baostock as bs
     d = _bs_date(date)
     rs = bs.query_history_k_data_plus(
         _bs_code(code), "date,close", start_date=d, end_date=d,
         frequency="d", adjustflag="3")
-    if rs is None or rs.error_code != "0":
-        msg = getattr(rs, "error_msg", "返回 None") if rs else "返回 None"
-        log(f"baostock 收盘价 {code} {date} 失败：{msg}")
-        return None
-    while rs.next():
-        row = rs.get_row_data()
-        try:
-            return float(row[1])
-        except (TypeError, ValueError):
-            return None
+    if rs is not None and rs.error_code == "0":
+        while rs.next():
+            row = rs.get_row_data()
+            try:
+                return float(row[1])
+            except (TypeError, ValueError):
+                return None
+    # 新浪兜底
+    v = _sina_close(code, date)
+    if v is not None:
+        return v
+    log(f"收盘价 {code} {date} baostock/新浪均无数据")
     return None
 
 
-def get_index_ytd_pct(code: str, date: str):
-    """计算指数/ETF 年初至今涨跌幅（%）；失败返回 None"""
-    year_start = _bs_date(f"{date[:4]}0101")
-    _bs_login()
+def get_index_ytd_pct(code: str, date: str, dates=None):
+    """年初至今涨跌幅（%）：YTD = (当日收盘 / 上一年度最后交易日收盘 - 1) * 100。
+
+    基准日为「上一年度最后一个交易日」；有交易日历时用交易日历精确取，
+    否则退化为查询上一年 12 月 1 日~当年 1 月 1 日之间最后一个收盘。
+    失败返回 None（绝不硬编码）。
+    """
+    year = int(date[:4])
+    if dates:
+        prev_days = [d for d in dates if d < f"{year}0101"]
+        base_date = prev_days[-1] if prev_days else None
+    else:
+        base_date = None
+
+    if base_date is None:
+        # 无交易日历：从上一年 12 月开始找最后一个交易日收盘（用 baostock 区间查询）
+        base_date = _prev_year_last_trade_day(code, year)
+
+    if base_date is None:
+        log(f"YTD {code} {date}：无法确定上一年度最后交易日基准")
+        return None
+
+    base_close = get_index_close(code, base_date)
+    cur_close = get_index_close(code, date)
+    if base_close is None or cur_close is None or base_close <= 0:
+        log(f"YTD {code} {date}：基准 {base_date} 收盘={base_close}，当日收盘={cur_close}，无法计算")
+        return None
+    return round((cur_close / base_close - 1) * 100, 2)
+
+
+def _prev_year_last_trade_day(code: str, year: int):
+    """无交易日历时的兜底：用 baostock 区间查询找上一年最后一个交易日。"""
     import baostock as bs
+    _bs_login()
+    start = _bs_date(f"{year - 1}1201")
+    end = _bs_date(f"{year}0101")
     rs = bs.query_history_k_data_plus(
-        _bs_code(code), "date,close", start_date=year_start, end_date=_bs_date(date),
+        _bs_code(code), "date", start_date=start, end_date=end,
         frequency="d", adjustflag="3")
     if rs is None or rs.error_code != "0":
-        msg = getattr(rs, "error_msg", "返回 None") if rs else "返回 None"
-        log(f"baostock YTD {code} {date} 失败：{msg}")
         return None
-    rows = []
+    last = None
     while rs.next():
-        rows.append(rs.get_row_data())
-    if len(rows) < 2:
-        return None
-    first_close = float(rows[0][1])
-    last_close = float(rows[-1][1])
-    if first_close <= 0:
-        return None
-    return round((last_close / first_close - 1) * 100, 2)
+        d = str(rs.get_row_data()[0]).replace("-", "")
+        if d < f"{year}0101":
+            last = d
+    return last

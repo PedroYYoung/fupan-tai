@@ -67,7 +67,13 @@ def test_build_inherits_industry_from_previous_day(monkeypatch, tmp_path):
                         lambda: ["20261007", prev_date, target_date])
     monkeypatch.setattr(build_main.spot_mod, "get_spot",
                         lambda d: _make_min_spot_df())
-    monkeypatch.setattr(build_main.index_mod, "get_index_amount", lambda c, d: None)
+    # 指数相关：全部 mock，避免测试发起真实网络请求（baostock/新浪/腾讯）
+    monkeypatch.setattr(build_main.index_mod, "get_index_amount_resilient",
+                        lambda c, d, lk=None: (None, None, ""))
+    monkeypatch.setattr(build_main.index_mod, "get_index_change_pct", lambda c, d: None)
+    monkeypatch.setattr(build_main.index_mod, "get_index_close", lambda c, d: None)
+    monkeypatch.setattr(build_main.index_mod, "get_index_ytd_pct", lambda c, d, dates=None: None)
+    monkeypatch.setattr(build_main.index_mod, "get_etf_proxy_amount", lambda c, d: None)
     monkeypatch.setattr(build_main.margin_mod, "get_margin", lambda d: (None, None))
     monkeypatch.setattr(build_main.zt_mod, "get_limit_pools", lambda d, spot: (0, 0, [], []))
     monkeypatch.setattr(build_main.compute, "microcap_proxy_amount", lambda spot: (0.0, 0))
@@ -78,10 +84,12 @@ def test_build_inherits_industry_from_previous_day(monkeypatch, tmp_path):
     monkeypatch.setattr(build_main.compute, "rank_of", lambda vals, v: None)
     monkeypatch.setattr(build_main.compute, "append_bucket_series", lambda *a, **k: None)
     monkeypatch.setattr(build_main.compute, "build_index_agg", lambda: None)
+    monkeypatch.setattr(build_main.compute, "avg_index_amount", lambda *a, **k: None)
     monkeypatch.setattr(build_main, "atomic_write_json", lambda p, o: _write_json(p, o))
 
-    # 行业模块失败
+    # 行业模块失败（当日 + 周排名均失败）
     monkeypatch.setattr(build_main.industry_mod, "get_industry_daily", lambda total: None)
+    monkeypatch.setattr(build_main.industry_mod, "get_industry_week_rank", lambda d, dates: None)
 
     build_main.build_one(target_date, ["20261007", prev_date, target_date])
 

@@ -22,8 +22,9 @@ def _threshold(code: str) -> float:
 
 
 def get_limit_pools(date: str, spot_df=None):
-    """返回 (limit_up, limit_down, lu_over10e, ld_over10e)
-    lu/ld_over10e: [{code,name,amount(亿),change,board}]
+    """返回 (limit_up, limit_down, lu_rows, ld_rows)
+    lu/ld_rows: 完整涨跌停个股 [{code,name,amount(亿),change,board,is_up}]，
+    由调用方自行按成交额门槛（≥5亿 / ≥10亿）切分，避免在此写死单一门槛。
     """
     lu_rows, ld_rows = [], []
     try:
@@ -45,12 +46,13 @@ def get_limit_pools(date: str, spot_df=None):
         log(f"跌停池失败（{e}），由快照自行判定兜底")
         ld_rows = _from_spot(spot_df, False)
 
-    lu_over10e = [r for r in lu_rows if r["amount"] >= 10]
-    ld_over10e = [r for r in ld_rows if r["amount"] >= 10]
-    lu_over10e.sort(key=lambda x: -x["amount"])
-    ld_over10e.sort(key=lambda x: -x["amount"])
-    log(f"{date} 涨停 {len(lu_rows)} / 跌停 {len(ld_rows)}；10亿以上 涨{len(lu_over10e)} 跌{len(ld_over10e)}")
-    return len(lu_rows), len(ld_rows), lu_over10e[:30], ld_over10e[:30]
+    lu_over10e = sum(1 for r in lu_rows if r["amount"] >= 10)
+    ld_over10e = sum(1 for r in ld_rows if r["amount"] >= 10)
+    lu_over5e = sum(1 for r in lu_rows if r["amount"] >= 5)
+    ld_over5e = sum(1 for r in ld_rows if r["amount"] >= 5)
+    log(f"{date} 涨停 {len(lu_rows)} / 跌停 {len(ld_rows)}；"
+        f"≥5亿 涨{lu_over5e} 跌{ld_over5e}；≥10亿 涨{lu_over10e} 跌{ld_over10e}")
+    return len(lu_rows), len(ld_rows), lu_rows, ld_rows
 
 
 def _row(r, code: str, name: str, is_up: bool) -> dict:

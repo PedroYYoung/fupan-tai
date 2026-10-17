@@ -9,16 +9,15 @@ export interface NavEntry {
   batch?: number
 }
 
-// 全部 11 个模块入口，均已交付
+// 全部 10 个模块入口，均已交付
 const nav: NavEntry[] = [
   { path: '/', icon: '🏠', label: '今日速览', enabled: true },
   { path: '/money', icon: '💰', label: '资金面', enabled: true },
   { path: '/index', icon: '📊', label: '指数观察', enabled: true },
-  { path: '/widebase', icon: '🧩', label: '宽基矩阵', enabled: true },
   { path: '/industry', icon: '🏭', label: '行业', enabled: true },
   { path: '/concentration', icon: '🎯', label: '个股集中度', enabled: true },
   { path: '/liquidity', icon: '📐', label: '流动性结构', enabled: true },
-  { path: '/emotion', icon: '🔥', label: '情绪', enabled: true },
+  { path: '/emotion', icon: '🔥', label: '上板与上涨', enabled: true },
   { path: '/report', icon: '📋', label: '复盘报告', enabled: true },
   { path: '/calendar', icon: '🔍', label: '日历回溯', enabled: true },
   { path: '/status', icon: '🟢', label: '数据状态', enabled: true },

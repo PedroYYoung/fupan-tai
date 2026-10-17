@@ -39,6 +39,10 @@ export interface IndexRow {
   note?: string | null
   /** 当日涨跌幅（%）；无可用行情源时为 null */
   change_pct?: number | null
+  /** 当日收盘点位；无可用行情源时为 null */
+  close?: number | null
+  /** 点位较上一交易日的差值；任一侧缺失为 null */
+  close_change?: number | null
   /** 成交额较上一交易日的差值（亿）；任一侧缺失为 null */
   amount_change?: number | null
   rank_year: number | null
@@ -66,6 +70,8 @@ export interface ValueBucket {
   pct: number
   /** 股票数量较上一交易日的差值；缺上一交易日为 null */
   count_change?: number | null
+  /** 占比较上一交易日的差值（百分点）；缺上一交易日为 null */
+  pct_change?: number | null
 }
 
 export interface IndexObservation {
@@ -101,6 +107,8 @@ export interface Bucket {
   pct: number
   /** 股票数量较上一交易日的差值；缺上一交易日为 null */
   count_change?: number | null
+  /** 占比较上一交易日的差值（百分点）；缺上一交易日为 null */
+  pct_change?: number | null
 }
 
 export interface Concentration {
@@ -110,7 +118,12 @@ export interface Concentration {
   top50: StockRow[]
   top20_cum_pct: number
   top50_cum_pct: number
+  top10_total: number
   top10_total_pctile_hist: number | null
+  /** Top10/Top20/Top50 累计占比较上一交易日的差值（百分点）；缺上一交易日为 null */
+  top10_change?: number | null
+  top20_change?: number | null
+  top50_change?: number | null
 }
 
 export interface Emotion {
@@ -122,8 +135,21 @@ export interface Emotion {
   ld_ratio_of_total: number
   lu_ratio_of_over10e: number
   ld_ratio_of_over10e: number
+  /** 成交额≥5亿的涨停/跌停家数 */
+  lu_over5e_count?: number
+  ld_over5e_count?: number
   lu_over10e: StockRow[]
   ld_over10e: StockRow[]
+}
+
+/** 高活跃个股（当日成交额≥5亿 且 涨幅≥5%） */
+export interface ActiveStock {
+  code: string
+  name: string
+  close: number
+  change_pct: number
+  amount: number
+  is_limit_up: boolean
 }
 
 export interface Sparklines {
@@ -202,6 +228,8 @@ export interface DailyData {
     over_10e_marketcap_value_buckets?: ValueBucket[]
   }
   emotion: Emotion
+  /** 高活跃个股（≥5亿且涨幅≥5%） */
+  active_stocks?: ActiveStock[]
   sparklines?: Sparklines
   index_observation?: IndexObservation[]
   industry_week_rank?: {

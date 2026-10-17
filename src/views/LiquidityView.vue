@@ -5,6 +5,7 @@ import type { Bucket, BucketSeriesFile, SeriesPoint, ValueBucket } from '../type
 import ChartPanel from '../components/ChartPanel.vue'
 import type { EChartsOption } from 'echarts'
 import { MUTED, TEXT, BORDER } from '../lib/echarts'
+import { pctDelta } from '../lib/format'
 
 const store = useDataStore()
 const o10Series = ref<SeriesPoint[]>([])
@@ -199,7 +200,7 @@ const stackOpt = computed<EChartsOption | null>(() => {
 <template>
   <div class="page">
     <h1 class="page-title">📐 流动性结构 · <span class="num">{{ daily ? store.formatDay(daily.trade_date) : '—' }}</span></h1>
-    <p class="page-desc">10亿以上活跃家数 + 成交额结构 + 活跃股市值结构 + 市值 6 档结构 · 各表格「股票数量」括号内为较上一交易日变化</p>
+    <p class="page-desc">10亿以上活跃家数 + 成交额结构 + 活跃股市值结构 + 市值 6 档结构 · 各表格「股票数量」「占比」括号内为较上一交易日变化（数量为家数差、占比为差值%）</p>
 
     <template v-if="liq && daily">
       <div class="card-grid cols-4">
@@ -231,7 +232,7 @@ const stackOpt = computed<EChartsOption | null>(() => {
             <thead><tr><th>成交额区间</th><th>股票数量</th><th>占全市场比例</th></tr></thead>
             <tbody>
               <tr v-for="b in amountBuckets" :key="b.label">
-                <td>{{ b.label }}</td><td class="num">{{ countText(b.count, b.count_change) }}</td><td class="num">{{ b.pct }}%</td>
+                <td>{{ b.label }}</td><td class="num">{{ countText(b.count, b.count_change) }}</td><td class="num">{{ b.pct }}%<span class="muted">{{ pctDelta(b.pct_change, 1) }}</span></td>
               </tr>
             </tbody>
           </table>
@@ -256,7 +257,7 @@ const stackOpt = computed<EChartsOption | null>(() => {
             <tbody>
               <tr v-for="b in mcapCountBuckets" :key="b.label">
                 <td><span class="dot" :style="{ background: MKTCAP_COLORS[b.label] }"></span>{{ b.label }}</td>
-                <td class="num">{{ countText(b.count, b.count_change) }}</td><td class="num">{{ b.pct }}%</td>
+                <td class="num">{{ countText(b.count, b.count_change) }}</td><td class="num">{{ b.pct }}%<span class="muted">{{ pctDelta(b.pct_change, 1) }}</span></td>
               </tr>
             </tbody>
           </table>
@@ -275,7 +276,7 @@ const stackOpt = computed<EChartsOption | null>(() => {
                 <td><span class="dot" :style="{ background: MKTCAP_COLORS[b.label] }"></span>{{ b.label }}</td>
                 <td class="num">{{ countText(b.count, b.count_change) }}</td>
                 <td class="num">{{ fmt(b.total_value, 0) }}</td>
-                <td class="num">{{ b.pct }}%</td>
+                <td class="num">{{ b.pct }}%<span class="muted">{{ pctDelta(b.pct_change, 1) }}</span></td>
               </tr>
             </tbody>
           </table>
@@ -293,7 +294,7 @@ const stackOpt = computed<EChartsOption | null>(() => {
           <thead><tr><th>档位</th><th>家数</th><th>占比</th></tr></thead>
           <tbody>
             <tr v-for="b in liq.mktcap_buckets" :key="b.label">
-              <td>{{ b.label }}</td><td class="num">{{ b.count }}</td><td class="num">{{ b.pct }}%</td>
+              <td>{{ b.label }}</td><td class="num">{{ countText(b.count, b.count_change) }}</td><td class="num">{{ b.pct }}%<span class="muted">{{ pctDelta(b.pct_change, 1) }}</span></td>
             </tr>
           </tbody>
         </table>

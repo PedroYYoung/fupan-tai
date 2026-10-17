@@ -112,9 +112,11 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
             amt, amt_date, note = index_mod.get_index_amount_resilient(
                 code, d, last_known_point(code))
             chg = index_mod.get_index_change_pct(code, d)
+            close = index_mod.get_index_close(code, d)
             return {"name": index_mod.INDEX_CODES[code], "code": code,
                     "amount": amt, "amount_date": amt_date, "note": note,
-                    "change_pct": chg, "amount_change": None,
+                    "change_pct": chg, "close": close,
+                    "amount_change": None, "close_change": None,
                     "rank_year": None, "rank_1y": None, "pctile_all": None,
                     "approx": (base_approx and amt is not None) or note != ""}
 
@@ -149,20 +151,50 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
     if prev_daily:
         prev_idx = {}
         for r in (prev_daily.get("index_volume") or []) + (prev_daily.get("widebase") or []):
-            prev_idx[r["code"]] = r.get("amount")
+            prev_idx[r["code"]] = r
         for r in idx_rows + wide_rows:
-            r["amount_change"] = _delta(r.get("amount"), prev_idx.get(r["code"]))
+            pr = prev_idx.get(r["code"]) or {}
+            r["amount_change"] = _delta(r.get("amount"), pr.get("amount"))
+            r["close_change"] = _delta(r.get("close"), pr.get("close"))
 
     # ---- 两融（T+1 发布，返回 (余额亿元, 实际统计日期)）----
     margin, margin_date = margin_mod.get_margin(date)
 
-    # ---- 涨跌停 ----
-    limit_up, limit_down, lu10, ld10 = zt_mod.get_limit_pools(date, spot_df)
+    # ---- 涨跌停（返回完整列表，按成交额门槛切分）----
+    limit_up, limit_down, lu_rows, ld_rows = zt_mod.get_limit_pools(date, spot_df)
+    lu_over10e = sorted((r for r in lu_rows if r["amount"] >= 10), key=lambda x: -x["amount"])[:30]
+    ld_over10e = sorted((r for r in ld_rows if r["amount"] >= 10), key=lambda x: -x["amount"])[:30]
+    lu_over5e_count = sum(1 for r in lu_rows if r["amount"] >= 5)
+    ld_over5e_count = sum(1 for r in ld_rows if r["amount"] >= 5)
+
+    # ---- 高活跃个股（当日成交额≥5亿 且 涨幅≥5%，供「上板与上涨」列表 + 导出）----
+    active_stocks = []
+    if {"amount", "change_pct", "close"}.issubset(spot_df.columns):
+        lu_codes = {r["code"] for r in lu_rows}
+        adf = spot_df.dropna(subset=["amount", "change_pct", "close"])
+        adf = adf[(adf["amount"] >= 5e8) & (adf["change_pct"] >= 5)]
+        adf = adf.sort_values("change_pct", ascending=False)
+        for _, r in adf.iterrows():
+            code = str(r["code"])
+            active_stocks.append({
+                "code": code, "name": str(r["name"]),
+                "close": round(float(r["close"]), 2),
+                "change_pct": round(float(r["change_pct"]), 2),
+                "amount": round(float(r["amount"]) / 1e8, 2),
+                "is_limit_up": code in lu_codes,
+            })
+    log(f"高活跃个股（≥5亿且涨幅≥5%）：{len(active_stocks)} 只")
 
     # ---- 概览 / 流动性 / 集中度 ----
     total_amount = round(float(spot_df["amount"].dropna().sum()) / 1e8, 2)
     over_cnt, over_ratio, stock_count = compute.over_10e(spot_df)
     conc = compute.concentration(spot_df)
+    # 个股集中度 Top10/Top20/Top50 累计占比较上一交易日变化（百分点差）
+    if conc is not None:
+        prev_conc = (prev_daily or {}).get("concentration") or {}
+        conc["top10_change"] = _delta(conc.get("top10_total"), prev_conc.get("top10_total"))
+        conc["top20_change"] = _delta(conc.get("top20_cum_pct"), prev_conc.get("top20_cum_pct"))
+        conc["top50_change"] = _delta(conc.get("top50_cum_pct"), prev_conc.get("top50_cum_pct"))
 
     # ---- 行业板块（东财 → 同花顺，当日涨跌TOP10）----
     industry = industry_mod.get_industry_daily(total_amount)
@@ -237,7 +269,7 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
     for r in idx_rows + wide_rows:
         index_observation.append({
             "code": r["code"], "name": r["name"],
-            "ytd_pct": index_mod.get_index_ytd_pct(r["code"], date),
+            "ytd_pct": index_mod.get_index_ytd_pct(r["code"], date, dates),
             "avg_week_amount": compute.avg_index_amount(r["code"], date, dates, "week"),
             "avg_month_amount": compute.avg_index_amount(r["code"], date, dates, "month"),
             "avg_year_amount": compute.avg_index_amount(r["code"], date, dates, "year"),
@@ -273,23 +305,26 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
     down_map = {p["date"]: p["value"] for p in lud_down}
     spark_lud = [{"date": p["date"], "up": p["value"], "down": down_map.get(p["date"], 0)} for p in lud]
 
-    # ---- 流动性结构：三个分档表「较昨日股票数量变化」----
-    # 同一分档口径（成交额门槛/市值分档/区间边界）取上一交易日快照中的 count，
-    # 缺上一交易日 → count_change=None（前端显示「—」），绝不按 0 计。
-    def _attach_count_change(buckets, prev_buckets):
-        pmap = {b["label"]: b.get("count") for b in (prev_buckets or [])}
+    # ---- 流动性结构：分档表「较昨日股票数量变化」+「百分比变化」----
+    # 同一分档口径（成交额门槛/市值分档/区间边界）取上一交易日快照中的 count / pct，
+    # 缺上一交易日 → *_change=None（前端显示「—」），绝不按 0 计。
+    def _attach_changes(buckets, prev_buckets):
+        pmap = {b["label"]: b for b in (prev_buckets or [])}
         for b in buckets:
             p = pmap.get(b["label"])
-            b["count_change"] = (b["count"] - p) if p is not None else None
+            b["count_change"] = (b["count"] - p["count"]) if p and p.get("count") is not None else None
+            b["pct_change"] = _delta(b.get("pct"), p.get("pct")) if p else None
         return buckets
 
     prev_liq = (prev_daily or {}).get("liquidity") or {}
-    amount_buckets = _attach_count_change(
+    amount_buckets = _attach_changes(
         compute.amount_buckets(spot_df), prev_liq.get("amount_buckets"))
-    o10e_mc_buckets = _attach_count_change(
+    o10e_mc_buckets = _attach_changes(
         compute.over_10e_marketcap_buckets(spot_df), prev_liq.get("over_10e_marketcap_buckets"))
-    o10e_mc_value_buckets = _attach_count_change(
+    o10e_mc_value_buckets = _attach_changes(
         compute.over_10e_marketcap_value_buckets(spot_df), prev_liq.get("over_10e_marketcap_value_buckets"))
+    mktcap_buckets = _attach_changes(
+        compute.mktcap_buckets(spot_df), prev_liq.get("mktcap_buckets"))
 
     daily = {
         "trade_date": date,
@@ -305,7 +340,7 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
         "liquidity": {
             "over_10e_count": over_cnt, "over_10e_ratio": over_ratio,
             "pctile_count": compute.pctile(series_values("over_10e_count"), over_cnt),
-            "mktcap_buckets": compute.mktcap_buckets(spot_df),
+            "mktcap_buckets": mktcap_buckets,
             "amount_buckets": amount_buckets,
             "over_10e_marketcap_buckets": o10e_mc_buckets,
             "over_10e_marketcap_value_buckets": o10e_mc_value_buckets,
@@ -316,10 +351,12 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
             "ld_pctile": compute.pctile(series_values("limit_down"), limit_down),
             "lu_ratio_of_total": round(limit_up / stock_count * 100, 2) if stock_count else 0,
             "ld_ratio_of_total": round(limit_down / stock_count * 100, 2) if stock_count else 0,
-            "lu_ratio_of_over10e": round(len(lu10) / over_cnt * 100, 1) if over_cnt else 0,
-            "ld_ratio_of_over10e": round(len(ld10) / over_cnt * 100, 1) if over_cnt else 0,
-            "lu_over10e": lu10, "ld_over10e": ld10,
+            "lu_ratio_of_over10e": round(len(lu_over10e) / over_cnt * 100, 1) if over_cnt else 0,
+            "ld_ratio_of_over10e": round(len(ld_over10e) / over_cnt * 100, 1) if over_cnt else 0,
+            "lu_over5e_count": lu_over5e_count, "ld_over5e_count": ld_over5e_count,
+            "lu_over10e": lu_over10e, "ld_over10e": ld_over10e,
         },
+        "active_stocks": active_stocks,
         "sparklines": {
             "total_amount": spark("total_amount"),
             "margin": spark("margin"),

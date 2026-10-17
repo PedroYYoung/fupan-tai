@@ -6,6 +6,7 @@ import ChartPanel from '../components/ChartPanel.vue'
 import { miniLineOption } from '../lib/echarts'
 import type { EChartsOption } from 'echarts'
 import { MUTED, TEXT, BORDER } from '../lib/echarts'
+import { pctDelta } from '../lib/format'
 
 const store = useDataStore()
 const concSeries = ref<SeriesPoint[]>([])
@@ -41,10 +42,13 @@ function industryText(row: StockRow): string {
   return '—'
 }
 
-// 三个辅助指标：Top10 / Top20 / Top50 成交占比
-const share10 = computed(() => top50.value.slice(0, 10).reduce((s, x) => s + (x.pct_of_total ?? 0), 0))
-const share20 = computed(() => top50.value.slice(0, 20).reduce((s, x) => s + (x.pct_of_total ?? 0), 0))
-const share50 = computed(() => top50.value.slice(0, 50).reduce((s, x) => s + (x.pct_of_total ?? 0), 0))
+// 三个辅助指标：Top10 / Top20 / Top50 成交占比（用后端累计口径）
+const share10 = computed(() => conc.value?.top10_total ?? 0)
+const share20 = computed(() => conc.value?.top20_cum_pct ?? 0)
+const share50 = computed(() => conc.value?.top50_cum_pct ?? 0)
+const chg10 = computed(() => conc.value?.top10_change ?? null)
+const chg20 = computed(() => conc.value?.top20_change ?? null)
+const chg50 = computed(() => conc.value?.top50_change ?? null)
 
 // 资金重要程度颜色分层
 function rankColor(rank: number): string {
@@ -162,21 +166,21 @@ const concOpt = computed(() =>
       <div class="card-grid cols-3" style="margin-top:14px">
         <div class="card">
           <div class="card-title">🔴 核心资金区 Top10</div>
-          <div class="card-value num">{{ fmt(share10) }}<span class="unit">%</span></div>
+          <div class="card-value num">{{ fmt(share10) }}<span class="unit">%</span><span class="muted" style="font-size:14px">{{ pctDelta(chg10, 2) }}</span></div>
           <div class="card-sub num">市场最核心成交资金</div>
           <span class="card-sample num">占全市场成交</span>
         </div>
         <div class="card">
           <div class="card-title">🟠 次核心资金区 Top20</div>
-          <div class="card-value num">{{ fmt(share20) }}<span class="unit">%</span></div>
-          <div class="card-sub num">较前10 +{{ fmt(share20 - share10) }}pct</div>
-          <span class="card-sample num">含前10累计</span>
+          <div class="card-value num">{{ fmt(share20) }}<span class="unit">%</span><span class="muted" style="font-size:14px">{{ pctDelta(chg20, 2) }}</span></div>
+          <div class="card-sub num">含前10累计</div>
+          <span class="card-sample num">累计口径</span>
         </div>
         <div class="card">
           <div class="card-title">🔵 普通活跃区 Top50</div>
-          <div class="card-value num">{{ fmt(share50) }}<span class="unit">%</span></div>
-          <div class="card-sub num">较前20 +{{ fmt(share50 - share20) }}pct</div>
-          <span class="card-sample num">含前20累计</span>
+          <div class="card-value num">{{ fmt(share50) }}<span class="unit">%</span><span class="muted" style="font-size:14px">{{ pctDelta(chg50, 2) }}</span></div>
+          <div class="card-sub num">含前20累计</div>
+          <span class="card-sample num">累计口径</span>
         </div>
       </div>
 

@@ -7,7 +7,7 @@ export const router = createRouter({
     { path: '/', name: 'today', component: () => import('./views/TodayView.vue') },
     { path: '/money', name: 'money', component: () => import('./views/MoneyView.vue') },
     { path: '/index', name: 'index', component: () => import('./views/IndexView.vue') },
-    { path: '/widebase', name: 'widebase', component: () => import('./views/WidebaseView.vue') },
+    { path: '/widebase', redirect: '/index' },
     { path: '/concentration', name: 'concentration', component: () => import('./views/ConcentrationView.vue') },
     { path: '/liquidity', name: 'liquidity', component: () => import('./views/LiquidityView.vue') },
     { path: '/emotion', name: 'emotion', component: () => import('./views/EmotionView.vue') },
