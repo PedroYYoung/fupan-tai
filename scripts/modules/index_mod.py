@@ -18,7 +18,7 @@ INDEX_CODES = {
     "sh000688": "科创50", "bj899050": "北证50",
     "sh000016": "上证50", "sh000300": "沪深300", "sz399673": "创业板50",
     "sh000905": "中证500", "sh000906": "中证800", "sh000852": "中证1000",
-    "sh932000": "中证2000", "sh000985": "中证全指", "hstech_513180": "恒生科技(513180近似)",
+    "sh932000": "中证2000", "sh000985": "中证全指(沪深合计代理)", "hstech_513180": "恒生科技(513180近似)",
 }
 
 # 已验证可用腾讯行情的代码（verify_data_sources.py 实测）
@@ -123,6 +123,44 @@ _ETF_PROXY_BS = {
 # 中证指数公司官网：tradingValue 即成交额（亿元），权威源，
 # 覆盖东财/腾讯/baostock 都取不全的中证系（含 932000 中证2000、000688 科创50）
 # 注：2026-10 实测该接口对所有指数均返回空 data，通道目前实际不可用，仅保留待其恢复。
+# 东财熔断：本机/CI 对 push2 系列接口存在反爬，失败会以 SSL 中断形式重试很久。
+# 连续失败 3 次后本次进程内不再尝试东财，直接走 baostock / 中证官网，
+# 避免「15 个指数 × 2 次重试 × 35 秒」把一次增量拖成半小时（不对坏源无限重试）。
+_EM_FAILS = {"n": 0}
+_EM_DISABLE_AFTER = 3
+
+
+def _em_available() -> bool:
+    return _EM_FAILS["n"] < _EM_DISABLE_AFTER
+
+
+def _em_failed():
+    _EM_FAILS["n"] += 1
+    if _EM_FAILS["n"] == _EM_DISABLE_AFTER:
+        log(f"东财通道连续失败 {_EM_DISABLE_AFTER} 次，本次运行剩余时间不再尝试")
+
+
+def _em_ok():
+    """一次成功即清零，保证熔断语义是「连续失败」而不是「累计失败」。"""
+    _EM_FAILS["n"] = 0
+
+
+# 「最近交易日降级」的最大可接受滞后（自然日）。超过此值说明该指数在目标日附近
+# 长期没有真实数据（源端空档 / 赛季缺口），复用旧值只会把陈旧数据伪装成当日值。
+MAX_STALE_DAYS = 10
+
+
+def _days_between(d1: str, d2: str):
+    """两个 YYYYMMDD 之间的自然日差；格式非法返回 None（宁可不复用，也不误用）。"""
+    import datetime as _dt
+    try:
+        a = _dt.datetime.strptime(str(d1), "%Y%m%d").date()
+        b = _dt.datetime.strptime(str(d2), "%Y%m%d").date()
+        return (b - a).days
+    except (TypeError, ValueError):
+        return None
+
+
 _CSINDEX_CODE_MAP = {
     "sh000016": "000016", "sh000300": "000300", "sh000688": "000688",
     "sh000905": "000905", "sh000906": "000906", "sh000852": "000852",
@@ -131,6 +169,21 @@ _CSINDEX_CODE_MAP = {
 _CSINDEX_URL = "https://www.csindex.com.cn/csindex-home/perf/index-perf"
 _CSINDEX_HEADERS = {"User-Agent": "Mozilla/5.0",
                     "Referer": "https://www.csindex.com.cn/"}
+
+# 中证官网在部分网络下整段不可达（SSL UNEXPECTED_EOF，单指数重试可达 4 分钟）。
+# 与东财一样加进程级熔断：连续失败 3 次后本次运行直接跳过，避免把增量拖成小时级。
+_CS_FAILS = {"n": 0}
+_CS_DISABLE_AFTER = 3
+
+
+def _cs_available() -> bool:
+    return _CS_FAILS["n"] < _CS_DISABLE_AFTER
+
+
+def _cs_failed():
+    _CS_FAILS["n"] += 1
+    if _CS_FAILS["n"] == _CS_DISABLE_AFTER:
+        log(f"中证官网连续失败 {_CS_DISABLE_AFTER} 次，本次运行剩余时间不再尝试")
 
 
 # 中证官网偶发 SSL 中断（UNEXPECTED_EOF），用带退避重试的 Session 提升 CI 稳定性
@@ -150,8 +203,10 @@ def _get_csindex_history(code: str, start: str, end: str) -> dict:
     cs = _CSINDEX_CODE_MAP.get(code)
     if not cs:
         return {}
+    if not _cs_available():
+        return {}
     last_err = None
-    for attempt in range(6):
+    for attempt in range(3):
         try:
             r = _CSINDEX_SESSION.get(_CSINDEX_URL,
                                      params={"indexCode": cs,
@@ -165,12 +220,14 @@ def _get_csindex_history(code: str, start: str, end: str) -> dict:
                 if len(d) == 8 and v is not None and float(v) > 0:
                     out[d] = round(float(v), 2)
             if out:
+                _CS_FAILS["n"] = 0
                 return out
             last_err = "返回空 data"
         except Exception as e:  # noqa: BLE001
             last_err = e
             time.sleep(0.6 * (attempt + 1))
-    log(f"中证官网 {code} 区间获取失败（已重试 6 次）：{last_err}")
+    _cs_failed()
+    log(f"中证官网 {code} 区间获取失败：{last_err}")
     return {}
 
 
@@ -179,34 +236,62 @@ def _get_csindex_amount(code: str, date: str):
     return _get_csindex_history(code, date, date).get(date)
 
 
+def _bs_relogin():
+    """baostock 连接被服务端断开（WinError 10054 / 网络接收错误）后重连。"""
+    global _BS_LOGGED
+    try:
+        import baostock as bs
+        try:
+            bs.logout()
+        except Exception:  # noqa: BLE001
+            pass
+        _BS_LOGGED = False
+        _bs_login()
+    except Exception as e:  # noqa: BLE001
+        log(f"baostock 重连失败：{e}")
+
+
+def _bs_query_amount(bsc: str, start: str, end: str) -> dict:
+    """单次 baostock 成交额查询；网络类错误抛出，交由调用方重连后重试。"""
+    import baostock as bs
+    _bs_login()
+    rs = bs.query_history_k_data_plus(bsc, "date,amount",
+                                      start_date=_bs_date(start),
+                                      end_date=_bs_date(end),
+                                      frequency="d", adjustflag="3")
+    if rs is None or rs.error_code != "0":
+        raise RuntimeError(getattr(rs, "error_msg", "无返回"))
+    out = {}
+    while rs.next():
+        row = rs.get_row_data()
+        try:
+            v = float(row[1])
+        except (TypeError, ValueError):
+            continue
+        if v > 0:
+            out[str(row[0]).replace("-", "")] = round(v / 1e8, 2)
+    return out
+
+
 def _get_bs_history(code: str, start: str, end: str) -> dict:
-    """baostock 区间成交额 {date: 亿元}；不适用或失败返回 {}。"""
+    """baostock 区间成交额 {date: 亿元}；不适用或失败返回 {}。
+
+    baostock 的 socket 会在连续查询若干次后被服务端断开（WinError 10054
+    「网络接收错误」），因此失败时 logout + 重新 login 再试一次，
+    而不是把当天数据直接判死（实测重连后同一查询立即成功）。
+    """
     bsc = _BS_CODE_MAP.get(code)
     if not bsc:
         return {}
-    try:
-        import baostock as bs
-        _bs_login()
-        rs = bs.query_history_k_data_plus(bsc, "date,amount",
-                                          start_date=_bs_date(start),
-                                          end_date=_bs_date(end),
-                                          frequency="d", adjustflag="3")
-        if rs is None or rs.error_code != "0":
-            log(f"baostock {code} 区间失败：{getattr(rs, 'error_msg', '无返回')}")
-            return {}
-        out = {}
-        while rs.next():
-            row = rs.get_row_data()
-            try:
-                v = float(row[1])
-            except (TypeError, ValueError):
+    for attempt in range(2):
+        try:
+            return _bs_query_amount(bsc, start, end)
+        except Exception as e:  # noqa: BLE001
+            if attempt == 0:
+                _bs_relogin()
                 continue
-            if v > 0:
-                out[str(row[0]).replace("-", "")] = round(v / 1e8, 2)
-        return out
-    except Exception as e:  # noqa: BLE001
-        log(f"baostock {code} 区间异常：{e}")
-        return {}
+            log(f"baostock {code} 区间异常：{e}")
+    return {}
 
 
 def _get_bs_amount(code: str, date: str):
@@ -217,7 +302,8 @@ def _get_bs_amount(code: str, date: str):
 def get_index_amount_history(code: str, start: str, end: str) -> dict:
     """区间指数成交额 {date: 亿元}；多源回退：东财 → baostock → 中证官网。"""
     pure = code[2:]
-    try:
+    if _em_available():
+      try:
         if code == "hstech_513180":
             df = retry(lambda: ak.fund_etf_hist_em(symbol="513180", period="daily",
                        start_date=start, end_date=end, adjust=""), what=f"ETF回补{code}")
@@ -229,8 +315,10 @@ def get_index_amount_history(code: str, start: str, end: str) -> dict:
         vals = {str(r["日期"]).replace("-", ""): round(float(r[col]) / 1e8, 2)
                 for _, r in df.iterrows()}
         if vals:
+            _em_ok()
             return vals
-    except Exception as e:  # noqa: BLE001
+      except Exception as e:  # noqa: BLE001
+        _em_failed()
         log(f"指数回补东财 {code} 失败：{e}")
     # baostock 优先（快、覆盖广）；中证官网仅兜底（覆盖 932000/000688/000985）
     vals = _get_bs_history(code, start, end)
@@ -249,8 +337,9 @@ def get_index_amount(code: str, date: str):
     4. 中证指数官网 tradingValue（CI 安全兜底；补 932000/000688/000985 缺口）
     5. 全部失败 → None，调用方保留旧数据
     """
-    # 通道 1：东财
-    try:
+    # 通道 1：东财（连续失败则熔断，本次运行不再尝试）
+    if _em_available():
+      try:
         if code == "hstech_513180":
             df = retry(lambda: ak.fund_etf_hist_em(symbol="513180", period="daily",
                        start_date=date, end_date=date, adjust=""), what=f"ETF{code}")
@@ -263,8 +352,10 @@ def get_index_amount(code: str, date: str):
         if df is not None and len(df) > 0 and amt_col in df.columns:
             v = float(df.iloc[-1][amt_col])
             if v > 0:
+                _em_ok()
                 return round(v / 1e8, 2) if v > 1e6 else round(v, 2)  # 元→亿
-    except Exception as e:  # noqa: BLE001
+      except Exception as e:  # noqa: BLE001
+        _em_failed()
         log(f"指数 {code} {date} 东财获取失败：{e}")
 
     # 通道 2：腾讯实时（CI 可用；仅当日）
@@ -335,11 +426,18 @@ def get_index_amount_resilient(code: str, date: str, last_known=None):
     if amt is not None:
         return amt, date, ""
     # 降级 1：最近一个已落盘的真实交易日数据（复用自身历史，非伪造）
+    # 但「最近」必须真的最近：sh932000 的序列止于 20251231（2026 年段是已删除的合成数据），
+    # 若不加闸门，20261020 会拿到 9 个月前的值并显示成当日成交额 —— 那不叫降级，叫陈旧冒充。
     if last_known:
         v, vd = last_known
         if v is not None and vd and str(vd) <= date:
-            log(f"指数 {code} {date} 当日无数据 → 降级复用最近交易日 {vd} 的 {v} 亿")
-            return v, str(vd), "last_trading_day"
+            gap = _days_between(str(vd), date)
+            if gap is not None and gap <= MAX_STALE_DAYS:
+                log(f"指数 {code} {date} 当日无数据 → 降级复用最近交易日 {vd} 的 {v} 亿（滞后 {gap} 天）")
+                return v, str(vd), "last_trading_day"
+            if gap is not None:
+                log(f"指数 {code} {date} 最近值 {vd} 已滞后 {gap} 天（> {MAX_STALE_DAYS}），"
+                    f"不再当作当日值复用")
     # 降级 2：同标的 ETF 代理（仅方向参考）
     v = get_etf_proxy_amount(code, date)
     if v is not None:
@@ -368,10 +466,23 @@ def _bs_date(d: str) -> str:
     return f"{d[:4]}-{d[4:6]}-{d[6:]}"
 
 
+BS_SOCKET_TIMEOUT = 25.0
+
+
 def _bs_login():
+    """baostock 登录（幂等）。
+
+    baostock 内部 socket 未设置超时，网络抖动时会永久挂起（实测 query_all_stock 可达 75s 以上）。
+    这里给全局 socket 一个上限：requests 调用均已显式传 timeout，不受影响；
+    baostock 的 login/query 则会按时抛错，交由上层回退到腾讯/东财通道。
+    """
     global _BS_LOGGED
     if not _BS_LOGGED:
+        import socket
+
         import baostock as bs
+
+        socket.setdefaulttimeout(BS_SOCKET_TIMEOUT)
         _BS_LOGGED = bool(bs.login())
 
 

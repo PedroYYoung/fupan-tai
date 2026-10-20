@@ -6,7 +6,7 @@ import ChartPanel from '../components/ChartPanel.vue'
 import type { EChartsOption } from 'echarts'
 import { MUTED, TEXT, BORDER } from '../lib/echarts'
 import { PERIODS, aggFromCodeAgg, type Period } from '../lib/agg'
-import { fmtNum, pctDelta, numDelta, pctClass } from '../lib/format'
+import { fmtBeijingTime, fmtNum, pctDelta, numDelta, pctClass } from '../lib/format'
 
 const store = useDataStore()
 const daily = computed(() => store.daily)
@@ -241,7 +241,7 @@ const compareOpt = computed<EChartsOption | null>(() => {
       </div>
     </template>
     <div v-else class="empty-box">
-      🟡 该日期暂无数据（最后更新：{{ store.meta?.updated_at ?? '—' }}），已展示最近一个有效交易日
+      🟡 该日期暂无数据（最后更新：{{ fmtBeijingTime(store.meta?.updated_at) }}），已展示最近一个有效交易日
     </div>
   </div>
 </template>

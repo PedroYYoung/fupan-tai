@@ -21,11 +21,21 @@ export interface Overview {
   margin_date?: string | null
   margin_rank_year: number | null
   margin_pctile_all: number | null
-  limit_up: number
-  limit_down: number
-  over_10e_count: number
-  over_10e_ratio: number
-  stock_count: number
+  limit_up: number | null
+  limit_down: number | null
+  /** 以下三项依赖全市场实时快照；无可靠历史来源时为 null（展示「—」，不填 0） */
+  over_10e_count: number | null
+  over_10e_ratio: number | null
+  stock_count: number | null
+}
+
+/** 全市场快照派生字段的数据质量标记 */
+export type SpotDerivedQuality = 'realtime' | 'carried_over' | 'unavailable'
+
+export interface DataQuality {
+  /** realtime=本次实时抓取 / carried_over=沿用旧快照原值 / unavailable=无可靠来源、字段已置空 */
+  spot_derived?: SpotDerivedQuality
+  note?: string
 }
 
 export interface IndexRow {
@@ -116,9 +126,10 @@ export interface Concentration {
   top10: StockRow[]
   top20: StockRow[]
   top50: StockRow[]
-  top20_cum_pct: number
-  top50_cum_pct: number
-  top10_total: number
+  /** 以下累计占比依赖全市场实时快照；无可靠历史来源时为 null（展示「—」，不填 0） */
+  top20_cum_pct: number | null
+  top50_cum_pct: number | null
+  top10_total: number | null
   top10_total_pctile_hist: number | null
   /** Top10/Top20/Top50 累计占比较上一交易日的差值（百分点）；缺上一交易日为 null */
   top10_change?: number | null
@@ -127,14 +138,15 @@ export interface Concentration {
 }
 
 export interface Emotion {
-  limit_up: number
-  limit_down: number
+  limit_up: number | null
+  limit_down: number | null
   lu_pctile: number | null
   ld_pctile: number | null
-  lu_ratio_of_total: number
-  ld_ratio_of_total: number
-  lu_ratio_of_over10e: number
-  ld_ratio_of_over10e: number
+  /** 占比依赖全市场快照家数；缺失时为 null（展示「—」，不填 0） */
+  lu_ratio_of_total: number | null
+  ld_ratio_of_total: number | null
+  lu_ratio_of_over10e: number | null
+  ld_ratio_of_over10e: number | null
   /** 成交额≥5亿的涨停/跌停家数 */
   lu_over5e_count?: number
   ld_over5e_count?: number
@@ -155,7 +167,8 @@ export interface ActiveStock {
 export interface Sparklines {
   total_amount: { date: string; value: number }[]
   margin: { date: string; value: number }[]
-  limit_up_down: { date: string; up: number; down: number }[]
+  /** down 为 null 表示该日无跌停数据（东财跌停池只保留最近 30 天），不是 0 家 */
+  limit_up_down: { date: string; up: number; down: number | null }[]
   over_10e_count: { date: string; value: number }[]
 }
 
@@ -219,8 +232,8 @@ export interface DailyData {
   }
   concentration: Concentration
   liquidity: {
-    over_10e_count: number
-    over_10e_ratio: number
+    over_10e_count: number | null
+    over_10e_ratio: number | null
     pctile_count: number | null
     mktcap_buckets: Bucket[]
     amount_buckets?: Bucket[]
@@ -228,6 +241,8 @@ export interface DailyData {
     over_10e_marketcap_value_buckets?: ValueBucket[]
   }
   emotion: Emotion
+  /** 实时快照派生字段的数据质量标记（缺失视为 normal 旧数据） */
+  data_quality?: DataQuality
   /** 高活跃个股（≥5亿且涨幅≥5%） */
   active_stocks?: ActiveStock[]
   sparklines?: Sparklines

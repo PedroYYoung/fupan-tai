@@ -75,7 +75,10 @@ def test_build_inherits_industry_from_previous_day(monkeypatch, tmp_path):
     monkeypatch.setattr(build_main.index_mod, "get_index_ytd_pct", lambda c, d, dates=None: None)
     monkeypatch.setattr(build_main.index_mod, "get_etf_proxy_amount", lambda c, d: None)
     monkeypatch.setattr(build_main.margin_mod, "get_margin", lambda d: (None, None))
-    monkeypatch.setattr(build_main.zt_mod, "get_limit_pools", lambda d, spot: (0, 0, [], []))
+    monkeypatch.setattr(build_main.zt_mod, "fetch_pools", lambda d, spot=None: {
+        "lu": 0, "ld": 0, "lu_rows": [], "ld_rows": [],
+        "lu_ok": True, "ld_ok": True, "lu_src": "eastmoney", "ld_src": "eastmoney",
+        "ld_reason": None})
     monkeypatch.setattr(build_main.compute, "microcap_proxy_amount", lambda spot: (0.0, 0))
     monkeypatch.setattr(build_main.compute, "over_10e", lambda spot: (0, 0.0, 0))
     monkeypatch.setattr(build_main.compute, "concentration", lambda spot: None)
@@ -88,7 +91,7 @@ def test_build_inherits_industry_from_previous_day(monkeypatch, tmp_path):
     monkeypatch.setattr(build_main, "atomic_write_json", lambda p, o: _write_json(p, o))
 
     # 行业模块失败（当日 + 周排名均失败）
-    monkeypatch.setattr(build_main.industry_mod, "get_industry_daily", lambda total: None)
+    monkeypatch.setattr(build_main.industry_mod, "get_industry_daily", lambda total, date=None: None)
     monkeypatch.setattr(build_main.industry_mod, "get_industry_week_rank", lambda d, dates: None)
 
     build_main.build_one(target_date, ["20261007", prev_date, target_date])

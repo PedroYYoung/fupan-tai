@@ -3,9 +3,10 @@ import { computed, ref, watch } from 'vue'
 import { useDataStore } from '../stores/data'
 import type { SeriesPoint, ActiveStock } from '../types'
 import ChartPanel from '../components/ChartPanel.vue'
+import SpotDataNotice from '../components/SpotDataNotice.vue'
 import type { EChartsOption } from 'echarts'
 import { UP, DOWN, MUTED, TEXT, BORDER } from '../lib/echarts'
-import { fmtNum } from '../lib/format'
+import { fmtBeijingTime, fmtNum } from '../lib/format'
 
 const store = useDataStore()
 const luSeries = ref<SeriesPoint[]>([])
@@ -59,13 +60,23 @@ const dualOpt = computed<EChartsOption | null>(() => {
     series: [
       { name: '涨停', type: 'line', smooth: true, symbol: 'none', data: lu.map((p) => p.value),
         lineStyle: { color: UP, width: 2 }, itemStyle: { color: UP } },
-      { name: '跌停', type: 'line', smooth: true, symbol: 'none', data: lu.map((p) => ldMap.get(p.date) ?? 0),
+      // 跌停缺失日必须留空（断点），不能补 0：0 家跌停是「当日无跌停」这一独立事实，
+      // 与「没有采集到」是两回事，混为一谈会凭空造出「跌停归零」的假信号。
+      { name: '跌停', type: 'line', smooth: true, symbol: 'none', connectNulls: false,
+        data: lu.map((p) => ldMap.get(p.date) ?? null),
         lineStyle: { color: DOWN, width: 2 }, itemStyle: { color: DOWN } }
     ]
   }
 })
 
 const nAll = computed(() => store.allSampleN())
+
+/** 近 60 个交易日内「有涨停但无跌停」的天数（数据缺口，不是 0 家） */
+const ldGapInWindow = computed(() => {
+  const lu = luSeries.value.slice(-60)
+  const ldMap = new Map(ldSeries.value.map((p) => [p.date, p.value]))
+  return lu.filter((p) => ldMap.get(p.date) == null).length
+})
 
 // ---- 导出 ----
 function download(filename: string, content: string, mime: string) {
@@ -113,30 +124,31 @@ function exportThs() {
   <div class="page">
     <h1 class="page-title">🔥 上板与上涨 · <span class="num">{{ daily ? store.formatDay(daily.trade_date) : '—' }}</span></h1>
     <p class="page-desc">涨停/跌停家数（5亿/10亿成交额门槛）+ 高活跃个股（成交额≥5亿且涨幅≥5%）· 剔除 ST/北交所/上市不足250日</p>
+    <SpotDataNotice />
 
     <template v-if="emotion && daily">
       <div class="card-grid cols-4">
         <div class="card">
           <div class="card-title">🔥 涨停</div>
-          <div class="card-value num up">{{ emotion.limit_up }}<span class="unit">家</span></div>
+          <div class="card-value num up">{{ fmtNum(emotion.limit_up, 0) }}<span class="unit">家</span></div>
           <div class="card-sub num">{{ nAll >= 30 && emotion.lu_pctile != null ? `历史 ${emotion.lu_pctile}%` : '样本不足' }}</div>
           <span class="card-sample num">样本N={{ nAll }}</span>
         </div>
         <div class="card">
           <div class="card-title">🧊 跌停</div>
-          <div class="card-value num down">{{ emotion.limit_down }}<span class="unit">家</span></div>
+          <div class="card-value num down">{{ fmtNum(emotion.limit_down, 0) }}<span class="unit">家</span></div>
           <div class="card-sub num">{{ nAll >= 30 && emotion.ld_pctile != null ? `历史 ${emotion.ld_pctile}%` : '样本不足' }}</div>
           <span class="card-sample num">样本N={{ nAll }}</span>
         </div>
         <div class="card">
           <div class="card-title">📐 占总股本数%</div>
           <div class="card-value num">{{ fmtNum(emotion.lu_ratio_of_total, 2) }} / {{ fmtNum(emotion.ld_ratio_of_total, 2) }}<span class="unit">%</span></div>
-          <div class="card-sub">涨停 / 跌停 占全部 {{ daily.overview.stock_count }} 只个股</div>
+          <div class="card-sub">涨停 / 跌停 占全部 {{ fmtNum(daily.overview.stock_count, 0) }} 只个股</div>
         </div>
         <div class="card">
           <div class="card-title">🎯 占10亿以上%</div>
           <div class="card-value num">{{ fmtNum(emotion.lu_ratio_of_over10e, 1) }} / {{ fmtNum(emotion.ld_ratio_of_over10e, 1) }}<span class="unit">%</span></div>
-          <div class="card-sub">10亿以上共 {{ daily.overview.over_10e_count }} 家</div>
+          <div class="card-sub">10亿以上共 {{ fmtNum(daily.overview.over_10e_count, 0) }} 家</div>
         </div>
       </div>
 
@@ -151,13 +163,13 @@ function exportThs() {
                 <td>≥ 5 亿元</td>
                 <td class="num up">{{ emotion.lu_over5e_count ?? '—' }}</td>
                 <td class="num down">{{ emotion.ld_over5e_count ?? '—' }}</td>
-                <td class="num">{{ (emotion.lu_over5e_count ?? 0) + (emotion.ld_over5e_count ?? 0) }}</td>
+                <td class="num">{{ emotion.lu_over5e_count != null && emotion.ld_over5e_count != null ? emotion.lu_over5e_count + emotion.ld_over5e_count : '—' }}</td>
               </tr>
               <tr>
                 <td>≥ 10 亿元（含于 ≥5 亿）</td>
                 <td class="num up">{{ emotion.lu_over10e.length }}</td>
                 <td class="num down">{{ emotion.ld_over10e.length }}</td>
-                <td class="num">{{ emotion.lu_over10e.length + emotion.ld_over10e.length }}</td>
+                <td class="num">{{ emotion.limit_down != null ? emotion.lu_over10e.length + emotion.ld_over10e.length : '—' }}</td>
               </tr>
             </tbody>
           </table>
@@ -169,6 +181,10 @@ function exportThs() {
         <div class="card-title">📈 涨停 / 跌停双折线（近60个交易日）</div>
         <ChartPanel v-if="dualOpt && nAll >= 30" :option="dualOpt" height="280px" />
         <div v-else class="empty-box">🟡 样本不足（N={{ nAll }}），不绘制折线</div>
+        <p v-if="ldGapInWindow > 0" class="muted" style="font-size:11px; margin:6px 0 0">
+          ⚠ 近 60 个交易日中有 {{ ldGapInWindow }} 天无跌停数据（东方财富跌停股池仅保留最近 30 个自然日，
+          历史缺口无法补齐）。断点表示「无数据」，不等于「当日跌停 0 家」。
+        </p>
       </div>
 
       <div class="card-grid cols-2" style="margin-top:14px">
@@ -242,7 +258,7 @@ function exportThs() {
       </div>
     </template>
     <div v-else class="empty-box">
-      🟡 该日期暂无数据（最后更新：{{ store.meta?.updated_at ?? '—' }}），已展示最近一个有效交易日
+      🟡 该日期暂无数据（最后更新：{{ fmtBeijingTime(store.meta?.updated_at) }}），已展示最近一个有效交易日
     </div>
   </div>
 </template>

@@ -34,6 +34,25 @@ CACHE = os.path.join(HERE, "_cache")
 os.makedirs(CACHE, exist_ok=True)
 
 INDEX_START = "2015-01-01"
+# 按指数配置历史起点：避免 --stage index 用统一 2015 起点重写时覆盖已回补的历史。
+# 仅收录 baostock 实测可连续获取的指数；sh000852 因 2011 年数据缺口（仅 1 行）暂不纳入。
+INDEX_START_BY_CODE = {
+    "sh000001": "1997-01-01",
+    "sz399001": "1997-01-01",
+    "sz399006": "2010-06-01",
+    "sh000016": "2004-01-01",
+    "sh000300": "2005-01-01",
+    "sz399673": "2014-06-18",
+    "sh000905": "2005-01-01",
+    "sh000906": "2007-01-01",
+}
+
+
+def index_start_for(code: str) -> str:
+    """返回该指数的历史起点；未配置者回退到 2015-01-01。"""
+    return INDEX_START_BY_CODE.get(code, INDEX_START)
+
+
 STOCKS_START = "2021-01-01"
 EXTEND_START = "1997-01-01"  # 涨跌停制度 1996-12-16 起，序列向过去延伸到此处
 EXTEND_END = "2020-12-31"    # 与主窗口 [STOCKS_START, target] 无缝衔接
@@ -119,7 +138,7 @@ def stage_index():
         bs_code = ("sh.513180" if code == "hstech_513180"
                    else f"{code[:2]}.{code[2:]}")  # sh000001 → sh.000001
         rs = bs.query_history_k_data_plus(bs_code, "date,amount",
-                                          start_date=INDEX_START, end_date=end, frequency="d")
+                                          start_date=index_start_for(code), end_date=end, frequency="d")
         rows = []
         while rs.error_code == "0" and rs.next():
             rows.append(rs.get_row_data())

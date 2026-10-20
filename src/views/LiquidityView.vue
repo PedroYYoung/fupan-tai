@@ -3,9 +3,10 @@ import { computed, ref, watch } from 'vue'
 import { useDataStore } from '../stores/data'
 import type { Bucket, BucketSeriesFile, SeriesPoint, ValueBucket } from '../types'
 import ChartPanel from '../components/ChartPanel.vue'
+import SpotDataNotice from '../components/SpotDataNotice.vue'
 import type { EChartsOption } from 'echarts'
 import { MUTED, TEXT, BORDER } from '../lib/echarts'
-import { pctDelta } from '../lib/format'
+import { fmtBeijingTime, pctDelta } from '../lib/format'
 
 const store = useDataStore()
 const o10Series = ref<SeriesPoint[]>([])
@@ -201,12 +202,13 @@ const stackOpt = computed<EChartsOption | null>(() => {
   <div class="page">
     <h1 class="page-title">📐 流动性结构 · <span class="num">{{ daily ? store.formatDay(daily.trade_date) : '—' }}</span></h1>
     <p class="page-desc">10亿以上活跃家数 + 成交额结构 + 活跃股市值结构 + 市值 6 档结构 · 各表格「股票数量」「占比」括号内为较上一交易日变化（数量为家数差、占比为差值%）</p>
+    <SpotDataNotice />
 
     <template v-if="liq && daily">
       <div class="card-grid cols-4">
         <div class="card">
           <div class="card-title">📐 10亿以上家数</div>
-          <div class="card-value num">{{ daily.overview.over_10e_count }}<span class="unit">家</span></div>
+          <div class="card-value num">{{ fmt(daily.overview.over_10e_count, 0) }}<span class="unit">家</span></div>
           <div class="card-sub num">
             {{ nAll >= 30 && liq.pctile_count != null ? `历史 ${liq.pctile_count}%` : '样本不足' }}
           </div>
@@ -215,7 +217,7 @@ const stackOpt = computed<EChartsOption | null>(() => {
         <div class="card">
           <div class="card-title">🥧 占全部个股</div>
           <div class="card-value num">{{ fmt(liq.over_10e_ratio) }}<span class="unit">%</span></div>
-          <div class="card-sub num">共 {{ daily.overview.stock_count }} 只</div>
+          <div class="card-sub num">共 {{ fmt(daily.overview.stock_count, 0) }} 只</div>
         </div>
       </div>
 
@@ -301,7 +303,7 @@ const stackOpt = computed<EChartsOption | null>(() => {
       </div>
     </template>
     <div v-else class="empty-box">
-      🟡 该日期暂无数据（最后更新：{{ store.meta?.updated_at ?? '—' }}），已展示最近一个有效交易日
+      🟡 该日期暂无数据（最后更新：{{ fmtBeijingTime(store.meta?.updated_at) }}），已展示最近一个有效交易日
     </div>
   </div>
 </template>

@@ -1,10 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""复盘台 · 公共工具：限速重试 / 原子写入 / 错误日志"""
+"""复盘台 · 公共工具：限速重试 / 原子写入 / 错误日志 / 北京时间
+
+时间规则（全项目统一）：
+- A 股业务日期一律使用北京时间（UTC+8，中国无夏令时，用固定偏移而非 tzdata，
+  避免 Windows / 精简容器缺少 Asia/Shanghai 时区库导致失败）。
+- `YYYYMMDD` / `YYYY-MM-DD` 是「交易日标识」，不从时间戳做时区换算，不因时区前移/后移。
+- 带时间含义的时间戳统一输出 ISO 8601 且带 +08:00 偏移。
+"""
 import json
 import os
 import time
 import datetime
+
+# 北京时间固定偏移（中国自 1991 年起不实行夏令时）
+CST = datetime.timezone(datetime.timedelta(hours=8), "Asia/Shanghai")
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # modules → scripts → 仓库根
 # 统一数据根：public/data（Vite 直接静态托管 /data/*，构建时随 dist 发布，
@@ -15,7 +25,17 @@ _req_count = 0
 
 
 def log(msg: str):
-    print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
+    print(f"[{datetime.datetime.now(CST).strftime('%H:%M:%S')}] {msg}", flush=True)
+
+
+def now_cst() -> datetime.datetime:
+    """当前北京时间（tz-aware）"""
+    return datetime.datetime.now(CST)
+
+
+def today_cst() -> str:
+    """北京时间的自然日 YYYYMMDD"""
+    return now_cst().strftime("%Y%m%d")
 
 
 def pace():
@@ -61,8 +81,9 @@ def record_error(msg: str) -> None:
     os.makedirs(os.path.join(DATA_DIR, "meta"), exist_ok=True)
     p = os.path.join(DATA_DIR, "meta", "last_error.log")
     with open(p, "a", encoding="utf-8") as f:
-        f.write(f"{datetime.datetime.now().isoformat(timespec='seconds')} {msg}\n")
+        f.write(f"{datetime.datetime.now(CST).isoformat(timespec='seconds')} {msg}\n")
 
 
 def now_iso() -> str:
-    return datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    """当前北京时间 ISO 8601（固定 +08:00，不随 runner / 本机时区漂移）"""
+    return datetime.datetime.now(CST).isoformat(timespec="seconds")

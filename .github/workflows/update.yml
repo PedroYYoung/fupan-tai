@@ -1,10 +1,21 @@
 name: update-data
 
+# 时区约定（务必保留注释）
+# ---------------------------------------------------------------
+# GitHub Actions 的 schedule **只支持 UTC**，没有 `timezone:` 字段可用，
+# 因此触发时间只能手动换算：北京时间 = UTC + 8。
+#   UTC 07:40 = 北京 15:40（收盘后 40 分钟，收盘价与成交额已定稿）
+#   UTC 11:30 = 北京 19:30（晚间主更新，可捕获 T+1 发布的两融）
+# 注意：`cron` 决定**何时跑**，不决定「数据属于哪个交易日」——后者由
+# scripts/build.py 的 last_closed_trade_date() 用北京时间（UTC+8）判定，
+# 且只有「目标日 == 最近已收盘交易日」才允许抓实时 spot。
+# 另有 TZ=Asia/Shanghai 供 `date` 等 shell 命令使用（runner 默认 UTC）。
+# ---------------------------------------------------------------
 on:
   schedule:
-    # UTC 07:00 = 北京时间 15:00：午后增量（可捕获两融等 T+1 发布的数据）
-    - cron: '0 7 * * 1-5'
-    # UTC 11:30 = 北京时间 19:30（收盘后）：全量增量数据
+    # UTC 07:40 = 北京时间 15:40：收盘后增量
+    - cron: '40 7 * * 1-5'
+    # UTC 11:30 = 北京时间 19:30：晚间全量增量
     - cron: '30 11 * * *'
   workflow_dispatch:
     inputs:
@@ -16,6 +27,9 @@ on:
 concurrency:
   group: update-data
   cancel-in-progress: true
+
+env:
+  TZ: Asia/Shanghai      # shell 层（date/git log）统一北京时区
 
 jobs:
   verify-sources:
@@ -84,6 +98,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No data changes"
           else
-            git commit -m "data: update $(date -u +%F)"
+            # TZ=Asia/Shanghai：提交信息里的日期是北京时间的交易日，不是 UTC 日期
+            git commit -m "data: update $(date +%F) $(TZ=Asia/Shanghai date +%H:%M) CST"
             git push
           fi
