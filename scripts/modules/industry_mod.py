@@ -9,9 +9,15 @@
 口径说明（UI 同步标注）：当日涨跌幅为板块口径，成交额单位亿元，
 占两市比 = 板块成交额 / 两市总成交额。
 """
+import json
+import os
+
 import akshare as ak
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from .common import retry, log
+from .common import retry, log, REPO_ROOT, now_iso, atomic_write_json
+
+# 行业快照缓存：两源均失败时用最近一次成功抓取结果兜底（不伪造当日、明确标注 stale）
+_CACHE_PATH = os.path.join(REPO_ROOT, "scripts", "_cache", "industry_last.json")
 
 
 def _industry_rows(df, total_amount, name_col, change_col, amount_col, amount_in_yi):
@@ -85,12 +91,38 @@ def _industry_daily_ths(total_amount):
             "note": "口径：同花顺行业板块当日数据"}
 
 
-def get_industry_daily(total_amount: float):
-    """返回 {top10_up, top10_down, source, note}；东财 → 同花顺，均失败返回 None"""
+def _save_industry_cache(payload: dict, date: str | None) -> None:
+    """成功抓取后落盘缓存；失败不影响主流程。"""
+    try:
+        os.makedirs(os.path.dirname(_CACHE_PATH), exist_ok=True)
+        atomic_write_json(_CACHE_PATH, {"as_of": date, "saved_at": now_iso(),
+                                        "payload": payload})
+    except Exception as e:  # noqa: BLE001
+        log(f"行业缓存写入失败（不影响主流程）：{e}")
+
+
+def load_industry_cache():
+    """读取最近一次成功的行业快照 → (payload, as_of)；无缓存返回 (None, None)。"""
+    try:
+        with open(_CACHE_PATH, "r", encoding="utf-8") as f:
+            obj = json.load(f)
+        payload = obj.get("payload")
+        if not isinstance(payload, dict):
+            return None, None
+        return payload, obj.get("as_of")
+    except Exception:  # noqa: BLE001
+        return None, None
+
+
+def get_industry_daily(total_amount: float, date: str | None = None):
+    """返回 {top10_up, top10_down, source, note}；东财 → 同花顺，均失败返回 None。
+    成功时写入缓存，供两源同时故障时由调用方兜底。"""
     data = _industry_daily_em(total_amount)
     if data is None:
         log("东财行业失败，降级同花顺行业板块")
         data = _industry_daily_ths(total_amount)
+    if data is not None:
+        _save_industry_cache(data, date)
     return data
 
 

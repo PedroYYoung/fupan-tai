@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useDataStore } from '../stores/data'
 import { conclude, type BucketPt } from '../rules/engine'
 import { getNote, setNote } from '../lib/notesdb'
+import SpotDataNotice from '../components/SpotDataNotice.vue'
 
 const store = useDataStore()
 const daily = computed(() => store.daily)
@@ -77,6 +78,7 @@ function fmt(n: number | null | undefined, digits = 0): string {
       <div>
         <h1 class="page-title">📋 复盘报告 · <span class="num">{{ daily ? store.formatDay(daily.trade_date) : '—' }}</span></h1>
         <p class="page-desc">关键指标总表 + 自动结论，可直接截图或导出 PNG 转发</p>
+        <SpotDataNotice />
       </div>
       <button class="btn" :disabled="exporting || !daily" @click="exportPng">
         {{ exporting ? '生成中…' : '🖼️ 导出 PNG' }}
@@ -106,13 +108,13 @@ function fmt(n: number | null | undefined, digits = 0): string {
               </tr>
               <tr>
                 <td>涨停家数</td>
-                <td class="num up">{{ daily.overview.limit_up }}</td>
+                <td class="num up">{{ fmt(daily.overview.limit_up) }}</td>
                 <td class="muted">—</td>
                 <td class="num">{{ daily.emotion.lu_pctile != null ? daily.emotion.lu_pctile + '%' : '—' }}</td>
               </tr>
               <tr>
                 <td>跌停家数</td>
-                <td class="num down">{{ daily.overview.limit_down }}</td>
+                <td class="num down">{{ fmt(daily.overview.limit_down) }}</td>
                 <td class="muted">—</td>
                 <td class="num">{{ daily.emotion.ld_pctile != null ? daily.emotion.ld_pctile + '%' : '—' }}</td>
               </tr>
@@ -124,7 +126,7 @@ function fmt(n: number | null | undefined, digits = 0): string {
               </tr>
               <tr>
                 <td>前10成交占比</td>
-                <td class="num">{{ fmt(daily.concentration.top10.reduce((s, x) => s + (x.pct_of_total ?? 0), 0), 1) }}%</td>
+                <td class="num">{{ daily.concentration.top10_total != null ? fmt(daily.concentration.top10_total, 1) + "%" : "—" }}</td>
                 <td class="muted">—</td>
                 <td class="num">{{ daily.concentration.top10_total_pctile_hist != null ? daily.concentration.top10_total_pctile_hist + '%' : '—' }}</td>
               </tr>
