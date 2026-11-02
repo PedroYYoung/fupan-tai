@@ -3,10 +3,11 @@ import { computed, ref, watch } from 'vue'
 import { useDataStore } from '../stores/data'
 import type { SeriesPoint, StockRow } from '../types'
 import ChartPanel from '../components/ChartPanel.vue'
+import SpotDataNotice from '../components/SpotDataNotice.vue'
 import { miniLineOption } from '../lib/echarts'
 import type { EChartsOption } from 'echarts'
 import { MUTED, TEXT, BORDER } from '../lib/echarts'
-import { pctDelta } from '../lib/format'
+import { fmtBeijingTime, ppDelta } from '../lib/format'
 
 const store = useDataStore()
 const concSeries = ref<SeriesPoint[]>([])
@@ -43,12 +44,24 @@ function industryText(row: StockRow): string {
 }
 
 // 三个辅助指标：Top10 / Top20 / Top50 成交占比（用后端累计口径）
-const share10 = computed(() => conc.value?.top10_total ?? 0)
-const share20 = computed(() => conc.value?.top20_cum_pct ?? 0)
-const share50 = computed(() => conc.value?.top50_cum_pct ?? 0)
+// 无可靠历史快照时为 null → 显示「—」，绝不以 0 冒充
+const share10 = computed(() => conc.value?.top10_total ?? null)
+const share20 = computed(() => conc.value?.top20_cum_pct ?? null)
+const share50 = computed(() => conc.value?.top50_cum_pct ?? null)
 const chg10 = computed(() => conc.value?.top10_change ?? null)
 const chg20 = computed(() => conc.value?.top20_change ?? null)
 const chg50 = computed(() => conc.value?.top50_change ?? null)
+
+// 变化基准日期：仅当实际回退到早于「前一交易日」时才返回该日期，
+// 前端据此显示「较 MM/DD」，不冒充昨日变化。
+const chgDate = computed<string | null>(() => {
+  const d = conc.value?.concentration_change_date ?? null
+  if (!d) return null
+  const list = store.meta?.list ?? []
+  const i = list.indexOf(store.currentDate)
+  const prev = i > 0 ? list[i - 1] : null
+  return prev && d !== prev ? d : null
+})
 
 // 资金重要程度颜色分层
 function rankColor(rank: number): string {
@@ -122,18 +135,20 @@ const concOpt = computed(() =>
   <div class="page">
     <h1 class="page-title">🎯 个股集中度 · <span class="num">{{ daily ? store.formatDay(daily.trade_date) : '—' }}</span></h1>
     <p class="page-desc">资金结构视角：前50名成交排名 + 分层占比 · 判断龙头集中 / 资金扩散 / 普遍活跃</p>
+    <SpotDataNotice />
 
     <template v-if="conc && daily">
       <!-- ① Top50 成交排名柱状图 -->
       <div class="card" style="margin-top:14px">
         <div class="card-title">📊 Top50 成交排名（按成交额降序 · 1-10核心/11-20次核心/21-50普通）</div>
-        <ChartPanel :option="top50Opt" height="320px" />
+        <ChartPanel v-if="top50.length" :option="top50Opt" height="320px" />
+        <div v-else class="empty-box">🟡 该日个股成交排名不可用（无可靠历史全市场快照）</div>
       </div>
 
       <!-- ② Top50 个股排名表 -->
       <div class="card" style="margin-top:14px">
         <div class="card-title">📋 Top50 成交额个股排名</div>
-        <div class="table-wrap" style="margin-top:8px">
+        <div v-if="top50.length" class="table-wrap" style="margin-top:8px">
           <table class="data">
             <thead>
               <tr>
@@ -154,31 +169,32 @@ const concOpt = computed(() =>
                 <td class="num">{{ row.code }}</td>
                 <td>{{ row.name }}</td>
                 <td class="num">{{ fmt(row.amount) }}</td>
-                <td class="num">{{ row.pct_of_total ?? 0 }}%</td>
+                <td class="num">{{ fmt(row.pct_of_total) }}%</td>
                 <td>{{ industryText(row) }}</td>
               </tr>
             </tbody>
           </table>
         </div>
+        <div v-else class="empty-box">🟡 该日 Top50 个股明细不可用</div>
       </div>
 
       <!-- ③ Top10/20/50 集中度卡片 -->
       <div class="card-grid cols-3" style="margin-top:14px">
         <div class="card">
           <div class="card-title">🔴 核心资金区 Top10</div>
-          <div class="card-value num">{{ fmt(share10) }}<span class="unit">%</span><span class="muted" style="font-size:14px">{{ pctDelta(chg10, 2) }}</span></div>
+          <div class="card-value num">{{ fmt(share10) }}<span class="unit">%</span><span class="muted" style="font-size:14px">{{ ppDelta(chg10, 2, chgDate) }}</span></div>
           <div class="card-sub num">市场最核心成交资金</div>
           <span class="card-sample num">占全市场成交</span>
         </div>
         <div class="card">
           <div class="card-title">🟠 次核心资金区 Top20</div>
-          <div class="card-value num">{{ fmt(share20) }}<span class="unit">%</span><span class="muted" style="font-size:14px">{{ pctDelta(chg20, 2) }}</span></div>
+          <div class="card-value num">{{ fmt(share20) }}<span class="unit">%</span><span class="muted" style="font-size:14px">{{ ppDelta(chg20, 2, chgDate) }}</span></div>
           <div class="card-sub num">含前10累计</div>
           <span class="card-sample num">累计口径</span>
         </div>
         <div class="card">
           <div class="card-title">🔵 普通活跃区 Top50</div>
-          <div class="card-value num">{{ fmt(share50) }}<span class="unit">%</span><span class="muted" style="font-size:14px">{{ pctDelta(chg50, 2) }}</span></div>
+          <div class="card-value num">{{ fmt(share50) }}<span class="unit">%</span><span class="muted" style="font-size:14px">{{ ppDelta(chg50, 2, chgDate) }}</span></div>
           <div class="card-sub num">含前20累计</div>
           <span class="card-sample num">累计口径</span>
         </div>
@@ -193,7 +209,7 @@ const concOpt = computed(() =>
       </div>
     </template>
     <div v-else class="empty-box">
-      🟡 该日期暂无数据（最后更新：{{ store.meta?.updated_at ?? '—' }}），已展示最近一个有效交易日
+      🟡 该日期暂无数据（最后更新：{{ fmtBeijingTime(store.meta?.updated_at) }}），已展示最近一个有效交易日
     </div>
   </div>
 </template>

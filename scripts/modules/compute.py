@@ -114,13 +114,30 @@ def over_10e_marketcap_value_buckets(spot_df):
     return rows
 
 
+MICRO_MIN_UNIVERSE = 100   # 微盘代理最小样本：后 10% 至少 100 只，否则「后10%」没有统计意义
+# 序列排名的可信最小样本：不足 30 个点时 rank/pctile 无统计意义，一律留空（前端显示 —）
+MIN_RANK_SAMPLE = 30
+
+
 def microcap_proxy_amount(spot_df):
-    """微盘代理：全A按总市值升序取后10%等权合成，返回其平均成交额（亿元）"""
+    """微盘代理：全A按总市值升序取后10%等权合成，返回其**平均**成交额（亿元/只）。
+
+    口径固定为「每只股票的平均成交额」，量级应随市场活跃度波动（历史区间约 0.2~1.5 亿元/只）。
+    若返回值出现两位数量级（如 130 亿元/只），说明统计对象或单位错了，而不是「微盘股变活跃」。
+    样本不足 MICRO_MIN_UNIVERSE 时返回 (None, k)，由调用方沿用旧值/留空。
+    """
+    if spot_df is None or "mktcap" not in spot_df.columns or "amount" not in spot_df.columns:
+        return None, 0
     df = spot_df.dropna(subset=["mktcap", "amount"]).copy()
+    df = df[df["mktcap"] > 0]
+    if df.empty:
+        return None, 0
     df = df.sort_values("mktcap")
     k = max(int(len(df) * 0.1), 1)
+    if k < MICRO_MIN_UNIVERSE:
+        return None, k
     micro = df.head(k)
-    return round(micro["amount"].mean() / 1e8, 2), k
+    return round(float(micro["amount"].mean()) / 1e8, 2), k
 
 
 def concentration(spot_df):
@@ -239,30 +256,49 @@ def update_series(key: str, name: str, unit: str, date: str, value):
     return write_series_merge(key, name, unit, {date: value})
 
 
-def write_series_merge(key: str, name: str, unit: str, values: dict):
+def write_series_merge(key: str, name: str, unit: str, values: dict, meta: dict | None = None):
     """批量合并：已有序列点 + 新值（新值优先），一次性整体重算排名/百分位后原子写出。
-    适合回补场景（避免逐点 update 的 O(n^3) 重算）。"""
+    适合回补场景（避免逐点 update 的 O(n^3) 重算）。
+
+    meta: 附加到文件顶层的元信息（如 coverage_start / source / note / min_sample），
+    前端忽略未知字段；用于标明口径与覆盖区间，避免把不完整序列当作全长历史。
+
+    **已有顶层元信息必须保留**：此前实现只写 key/name/unit/updated_at，
+    导致每次增量把 coverage_start / proxy / demo_removed 等口径声明抹掉，
+    前端于是把 3 个点的序列当成全长历史。现在除 points/updated_at 外整体继承。
+    """
     import json, os
     from .common import DATA_DIR, atomic_write_json, now_iso
     path = os.path.join(DATA_DIR, "series", f"{key}.json")
     merged = {}
+    inherited = {}
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
-            for p in json.load(f).get("points", []):
-                if p.get("value") is not None:
-                    merged[p["date"]] = p["value"]
+            obj = json.load(f)
+        inherited = {k: v for k, v in obj.items()
+                     if k not in ("points", "updated_at", "key", "name", "unit")}
+        for p in obj.get("points", []):
+            if p.get("value") is not None:
+                merged[p["date"]] = p["value"]
     merged.update({d: v for d, v in values.items() if v is not None})
     points = [{"date": d, "value": v} for d, v in sorted(merged.items())]
     vals = [p["value"] for p in points]
     dates = [p["date"] for p in points]
+    # 样本过少时排名/百分位无意义（3~5 个点的「历史分位」会误导），一律留空
+    enough = len(points) >= MIN_RANK_SAMPLE
     for i, p in enumerate(points):
         v = p["value"]
+        if not enough:
+            p["rank_all"] = p["pctile"] = p["rank_year"] = p["rank_1y"] = None
+            continue
         p["rank_all"] = rank_of(vals, v)
         p["pctile"] = pctile(vals, v)
         year_vals = [q["value"] for q, d in zip(points, dates) if d.startswith(p["date"][:4])]
         p["rank_year"] = rank_of(year_vals, v) if year_vals else None
         lo = max(0, i - 243)
         p["rank_1y"] = rank_of(vals[lo:i + 1], v)
+    if meta:
+        inherited.update(meta)
     atomic_write_json(path, {"key": key, "name": name, "unit": unit,
-                             "updated_at": now_iso(), "points": points})
+                             "updated_at": now_iso(), **inherited, "points": points})
     log(f"序列 {key} 共 {len(points)} 点（本次合并 {len(values)} 个新值）")

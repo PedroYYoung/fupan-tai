@@ -71,3 +71,69 @@ def backfill_series(window: list, dates: list):
         compute.write_series_merge("limit_down", "跌停家数", "家", ld_vals)
 
     log("===== 序列回补完成（over_10e/市值分档/集中度无法历史回补，自启用日起累积）=====")
+
+
+# 跌停池服务端保留窗口（自然日）。窗口外的日期永远补不回来，只能标记缺口。
+LIMIT_POOL_HEAL_DAYS = 25
+# 东财跌停池实际按自然日保留约 30 天，留 2 天缓冲；更早的日期请求必然返回空池（不可信），
+# 因此不再发请求，直接计入 missing（避免每次增量都对必然失败的日期做无意义重试）。
+DT_POOL_REACHABLE_DAYS = 28
+
+
+def heal_recent_limit_pools(dates: list, target: str, days: int = LIMIT_POOL_HEAL_DAYS) -> dict:
+    """补采最近窗口内「只有涨停没有跌停」的日期。
+
+    背景：东财跌停股池只保留最近 30 个自然日，历史日期永远拿不到；一旦某天漏采，
+    之后无法补救。因此每次增量运行都检查最近窗口内的缺口并立即回补——只补缺口，
+    不重抓已有值（避免覆盖已核验数据），也不为「接口失败」写 0。
+
+    返回 {"checked": n, "filled": [dates], "still_missing": [dates]}
+    """
+    import datetime
+    import json
+    import os
+    from .common import DATA_DIR, now_cst
+
+    if target not in dates:
+        return {"checked": 0, "filled": [], "still_missing": []}
+    i = dates.index(target)
+    window = dates[max(0, i - days + 1): i + 1]
+
+    def _dates_of(key):
+        p = os.path.join(DATA_DIR, "series", f"{key}.json")
+        if not os.path.exists(p):
+            return set()
+        with open(p, encoding="utf-8") as f:
+            return {pt["date"] for pt in json.load(f).get("points", [])
+                    if pt.get("value") is not None}
+
+    # limit_up_down 即「涨停家数」序列（前端 sparkline 由 build.py 组合 up/down）
+    have_ld, have_lu = _dates_of("limit_down"), _dates_of("limit_up_down")
+    gaps = [d for d in window if d not in have_ld or d not in have_lu]
+    if not gaps:
+        log(f"涨跌停窗口自愈：最近 {len(window)} 个交易日无缺口")
+        return {"checked": len(window), "filled": [], "still_missing": []}
+
+    cutoff = (now_cst().date() - datetime.timedelta(days=DT_POOL_REACHABLE_DAYS)).strftime("%Y%m%d")
+    reachable = [d for d in gaps if d >= cutoff]
+    expired = [d for d in gaps if d < cutoff]
+    log(f"涨跌停窗口自愈：检测到 {len(gaps)} 个缺口日 {gaps[0]}~{gaps[-1]}；"
+        f"其中 {len(expired)} 天已超出东财 30 天保留窗口（不再重试，按缺口保留）")
+
+    lu_fill, ld_fill, missing = {}, {}, list(expired)
+    for d in reachable:
+        r = zt_mod.fetch_pools(d)          # 历史日不传 spot_df：绝不伪造
+        if r["lu_ok"] and d not in have_lu:
+            lu_fill[d] = r["lu"]
+        if r["ld_ok"] and d not in have_ld:
+            ld_fill[d] = r["ld"]
+        if d not in have_ld and not r["ld_ok"]:
+            missing.append(d)
+    if lu_fill:
+        compute.write_series_merge("limit_up_down", "涨停家数", "家", lu_fill)
+    if ld_fill:
+        compute.write_series_merge("limit_down", "跌停家数", "家", ld_fill)
+    filled = sorted(set(lu_fill) | set(ld_fill))
+    log(f"涨跌停窗口自愈：可补窗口内 {len(reachable)} 天，补齐 {len(filled)} 天，"
+        f"仍缺 {len(missing)} 天（跌停池超窗部分永久缺失，前端断点显示）")
+    return {"checked": len(window), "filled": filled, "still_missing": missing}

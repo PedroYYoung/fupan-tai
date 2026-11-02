@@ -88,35 +88,79 @@ def get_spot(date: str = None) -> pd.DataFrame:
     raise SpotFetchError("全市场快照三通道均失败 || " + " || ".join(errors))
 
 
+def _bs_code_list(day: str, timeout: float = 25.0):
+    """baostock 当日沪深 A 股成分（不含北交所）；失败/超时返回 []。
+
+    baostock 的查询没有自带超时，服务端卡住会把整条流水线拖死，因此临时收紧
+    socket 默认超时；超时即放弃该来源，改走本地缓存清单（宁可用略旧的清单，
+    也不要整条链路挂起）。
+    """
+    import socket
+
+    old = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(timeout)
+    codes = []
+    try:
+        import baostock as bs
+        bs.login()
+        try:
+            rs = bs.query_all_stock(day=day)
+            while getattr(rs, "error_code", "-1") == "0" and rs.next():
+                bs_code = rs.get_row_data()[0]
+                if bs_code.startswith(("sh.60", "sh.68", "sz.00", "sz.30")):
+                    codes.append(bs_code.replace(".", ""))
+        finally:
+            try:
+                bs.logout()
+            except Exception:  # noqa: BLE001
+                pass
+    except Exception as e:  # noqa: BLE001
+        log(f"baostock 成分清单不可用（{type(e).__name__}: {e}）")
+    finally:
+        socket.setdefaulttimeout(old)
+    return codes
+
+
+def _cached_code_list():
+    """本地缓存的全市场代码清单（scripts/_cache/stocks_agg.pkl 的 done 列表）。"""
+    import os
+    import pickle
+
+    p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     "_cache", "stocks_agg.pkl")
+    if not os.path.exists(p):
+        return []
+    try:
+        with open(p, "rb") as f:
+            agg = pickle.load(f)
+        return [c.replace(".", "") for c in agg.get("done", [])]
+    except Exception as e:  # noqa: BLE001
+        log(f"本地代码清单缓存读取失败（{type(e).__name__}）")
+        return []
+
+
 def _tencent_spot(date: str = None) -> pd.DataFrame:
     """腾讯批量行情快照。
 
-    代码清单：baostock query_all_stock（当日沪深 A 股成分，不含北交所）。
+    代码清单：baostock query_all_stock（当日沪深 A 股成分，不含北交所）→
+    失败时回退本地缓存清单（可能缺最近新上市的股票，但不会让流水线挂起）。
     字段（qt.gtimg.cn）：f[1]=名称 f[2]=代码 f[3]=最新价 f[32]=涨跌幅
     f[37]=成交额(万元) f[44]=流通市值(亿) f[45]=总市值(亿)
     """
     import requests
-    import baostock as bs
 
     if date is None:
         date = datetime.datetime.now().strftime("%Y%m%d")
     day = f"{date[:4]}-{date[4:6]}-{date[6:]}" if len(str(date)) == 8 else str(date)
 
-    codes = []
-    bs.login()
-    try:
-        rs = bs.query_all_stock(day=day)
-        while getattr(rs, "error_code", "-1") == "0" and rs.next():
-            bs_code = rs.get_row_data()[0]
-            if bs_code.startswith(("sh.60", "sh.68", "sz.00", "sz.30")):
-                codes.append(bs_code.replace(".", ""))
-    finally:
-        try:
-            bs.logout()
-        except Exception:  # noqa: BLE001
-            pass
+    codes = _bs_code_list(day)
+    src = "baostock"
     if not codes:
-        raise RuntimeError(f"baostock 当日({day})成分清单为空")
+        codes = _cached_code_list()
+        src = "本地缓存清单"
+        log(f"baostock 成分不可用，改用{src}（{len(codes)} 只）")
+    if not codes:
+        raise RuntimeError(f"当日({day})成分清单为空（baostock 与本地缓存均不可用）")
 
     s = requests.Session()
     s.trust_env = False
@@ -146,4 +190,4 @@ def _tencent_spot(date: str = None) -> pd.DataFrame:
                 continue
     df = pd.DataFrame(rows, columns=["code", "name", "close", "change_pct",
                                      "amount", "mktcap", "float_mktcap"])
-    return _normalize(df, "腾讯批量")
+    return _normalize(df, f"腾讯批量/{src}（{len(codes)} 只）")

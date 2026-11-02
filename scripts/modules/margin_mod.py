@@ -1,16 +1,20 @@
 # -*- coding: utf-8 -*-
-"""两融余额：上交所 + 深交所官网汇总。
+"""两融余额：上交所官网 + 深市金十镜像。
 
-数据源（均为交易所官网，非东财、可被 GitHub Actions 访问）：
+数据源（均可被 GitHub Actions 稳定访问）：
 - 沪市：上海证券交易所 queryMargin.do（单位「元」，字段 rzrqjyzl=融资融券余额）
-- 深市：ak.stock_margin_szse(date)（单位「亿元」，字段 融资融券余额）
+- 深市：金十数据镜像 cdn.jin10.com/data_center/reports/fs_2.json（深交所官方两融数据的
+  镜像，单次返回全量历史，字段 values[date][5]=融资融券余额，单位「元」；
+  已与深交所官方 ShowReport 接口交叉验证一致，舍入误差 <=0.01 亿）
 
 关键口径 / 已知坑：
 - 两融余额 = 沪市汇总余额 + 深市汇总余额（亿元）
-- 沪市/深市单位不同：沪市为元（需 /1e8），深市为亿元（不得再除）
+- 沪市/深市原始单位均为元（需 /1e8 转亿元）
 - 两融数据 T+1 发布：目标交易日当日通常未就绪，需回退到最近一个已发布交易日
 - 本机/部分环境 requests 默认信任系统代理会导致 SSE 接口返回空（JSONDecodeError），
   故沪市抓取使用 trust_env=False 的 Session。
+- 深交所官方 ShowReport 接口会高频封 IP（RemoteDisconnected），故深市改用金十镜像
+  （与官方同源、不封禁），避免每次增量更新触发封禁。
 """
 import datetime
 
@@ -19,6 +23,7 @@ import requests
 from .common import retry, log, pace
 
 _SSE_URL = "https://query.sse.com.cn/marketdata/tradedata/queryMargin.do"
+_SZSE_JIN10_URL = "https://cdn.jin10.com/data_center/reports/fs_2.json"
 _SSE_HEADERS = {
     "Referer": "https://www.sse.com.cn/",
     "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -73,19 +78,57 @@ def _fetch_sse_range(start8: str, end8: str) -> dict:
         return {}
 
 
-def _fetch_szse(date8: str):
-    """深交所两融单日查询 → 亿元；失败返回 None。
+def _fetch_szse_official(d8: str):
+    """深交所官方单日「融资融券余额」（亿元）；失败返回 None（绝不估算）。
 
-    深交所返回的「融资融券余额」单位已为亿元，不得再除 1e8。
+    数据源：akshare stock_margin_szse(date=YYYYMMDD)，即深交所官网 catalog 1837_xxpl。
+    字段「融资融券余额」= 融资余额 + 融券余额，单位亿元，与金十镜像、margin 序列口径一致。
+    单日精确到交易日；T+1 发布，目标日当日通常无数据（返回 None）。
     """
-    import akshare as ak
     try:
-        pace()
-        z = ak.stock_margin_szse(date=date8)
-        col = "融资融券余额" if "融资融券余额" in z.columns else "合计融资融券余额"
-        return float(z[col].iloc[0])
-    except Exception:  # noqa: BLE001
+        import akshare as ak
+        df = ak.stock_margin_szse(date=d8)
+        if df is None or df.empty:
+            return None
+        v = float(df.iloc[0]["融资融券余额"])
+        return round(v, 2) if v > 0 else None
+    except Exception as e:  # noqa: BLE001
+        log(f"两融深市官方 {d8} 获取失败：{type(e).__name__} {str(e)[:80]}")
         return None
+
+
+def _fetch_szse_jin10() -> dict:
+    """深市两融全量（金十镜像）→ {YYYYMMDD: 亿元}；失败返回 {}。
+
+    金十数据 cdn.jin10.com 的 fs_2.json 是深交所官方两融数据的镜像（第三方数据商），
+    单次返回全量历史（含最新交易日），无分页、无高频封禁。字段 values[date] 为 6 元素
+    数组，其中 values[date][5] 为「融资融券余额」（单位「元」，= 融资余额 + 融券余额）。
+    已与深交所官方 ShowReport 接口交叉验证一致（舍入误差 <=0.01 亿）。
+    """
+    try:
+        r = requests.get(_SZSE_JIN10_URL, params={"_": "1"}, timeout=30)
+        r.raise_for_status()
+        vals = r.json().get("values") or {}
+        out = {}
+        for d, v in vals.items():
+            d8 = str(d).replace("-", "")
+            if len(d8) != 8 or not isinstance(v, (list, tuple)) or len(v) < 6:
+                continue
+            try:
+                val = v[5]  # 融资融券余额（元）
+                if val is None:
+                    continue
+                val = round(float(val) / 1e8, 2)
+                if val <= 0 and d8 != "20100331":
+                    # 金十坏值：部分日期缺失被记为 0（如 20240808），仅试点首日可为 0
+                    continue
+                out[d8] = val
+            except (TypeError, ValueError):
+                continue
+        return out
+    except Exception as e:  # noqa: BLE001
+        log(f"两融深市（金十镜像）获取失败：{e}")
+        return {}
 
 
 def get_margin_total(date: str):
@@ -99,7 +142,7 @@ def get_margin_total(date: str):
     d8 = _fmt8(date)
     sse_map = _fetch_sse_range(d8, d8)
     sse = sse_map.get(d8)
-    szse = _fetch_szse(d8)
+    szse = _fetch_szse_jin10().get(d8)
     if sse is None and szse is None:
         return None, None, None, False
     if sse is None or szse is None:
@@ -125,13 +168,22 @@ def get_margin(date: str, lookback_days: int = 15):
         log(f"两融沪市 {start8}~{d8} 无已发布数据")
         return None, None
 
-    # 深市：逐日查询（深交所单日接口，单位亿元）
-    szse_map = {}
-    for i in range(lookback_days + 1):
-        dd = (end - datetime.timedelta(days=i)).strftime("%Y%m%d")
-        v = _fetch_szse(dd)
-        if v is not None:
-            szse_map[dd] = v
+    # 深市：金十镜像一次取全量（单位亿元），截取回退窗口内的日期
+    szse_all = _fetch_szse_jin10()
+    szse_map = {d: v for d, v in szse_all.items() if start8 <= d <= d8}
+
+    # 金十镜像可能停更（历史曾停在 20261020）→ 对「沪市有、深市缺」的最近日期，
+    # 用深交所官方接口逐日补齐，使沪深合计能推进到最新交易日（而非停在金十的陈旧日）。
+    missing_sz = sorted(set(sse_map) - set(szse_map), reverse=True)
+    if missing_sz:
+        # 只补回退窗口内、且不早于金十最新日的少量日期，控制请求次数
+        jin10_latest = max(szse_map) if szse_map else ""
+        todo = [d for d in missing_sz if (not jin10_latest or d > jin10_latest)][:12]
+        for d in todo:
+            v = _fetch_szse_official(d)
+            if v is not None:
+                szse_map[d] = v
+                log(f"两融深市官方补齐 {d}（{v} 亿）")
 
     common = sorted(set(sse_map) & set(szse_map), reverse=True)
     if not common:

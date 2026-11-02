@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """本次升级新增逻辑回归测试：
-1. 科创50/北证50 YTD 口径（上一年度最后交易日为基准）
+1. 科创50 YTD 口径（上一年度最后交易日为基准）
 2. 两融精确回填 get_margin_total（沪+深、单位、双边校验）
 3. 涨跌停 5亿/10亿 门槛切分
 """
@@ -24,14 +24,14 @@ def test_ytd_returns_none_when_base_missing(monkeypatch):
     """基准日收盘缺失时返回 None，绝不硬编码。"""
     dates = ["20251229", "20251230", "20251231", "20260105", "20261016"]
     monkeypatch.setattr(index_mod, "get_index_close", lambda c, d: None)
-    assert index_mod.get_index_ytd_pct("bj899050", "20261016", dates) is None
+    assert index_mod.get_index_ytd_pct("sh000688", "20261016", dates) is None
 
 
 # ---------------------------------------------------------------- 两融
 def test_get_margin_total_sums_sse_and_szse(monkeypatch):
-    """沪市（元已转亿）+ 深市（亿元）正确汇总，双边齐全。"""
+    """沪市（元已转亿）+ 深市（金十镜像，亿元）正确汇总，双边齐全。"""
     monkeypatch.setattr(margin_mod, "_fetch_sse_range", lambda s, e: {"20261014": 12990.05})
-    monkeypatch.setattr(margin_mod, "_fetch_szse", lambda d: 12280.16)
+    monkeypatch.setattr(margin_mod, "_fetch_szse_jin10", lambda: {"20261014": 12280.16})
     total, sse, szse, both = margin_mod.get_margin_total("20261014")
     assert sse == pytest.approx(12990.05)
     assert szse == pytest.approx(12280.16)
@@ -42,7 +42,7 @@ def test_get_margin_total_sums_sse_and_szse(monkeypatch):
 def test_get_margin_total_single_side_not_treated_as_full(monkeypatch):
     """深市缺失时 both=False，不得把单边当完整双边总额。"""
     monkeypatch.setattr(margin_mod, "_fetch_sse_range", lambda s, e: {"20261014": 12990.05})
-    monkeypatch.setattr(margin_mod, "_fetch_szse", lambda d: None)
+    monkeypatch.setattr(margin_mod, "_fetch_szse_jin10", lambda: {})
     total, sse, szse, both = margin_mod.get_margin_total("20261014")
     assert sse == pytest.approx(12990.05)
     assert szse is None

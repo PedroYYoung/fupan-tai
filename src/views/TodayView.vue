@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useDataStore } from '../stores/data'
 import { conclude, type BucketPt } from '../rules/engine'
 import MetricCard from '../components/MetricCard.vue'
+import SpotDataNotice from '../components/SpotDataNotice.vue'
 import MiniLine from '../components/MiniLine.vue'
 
 const store = useDataStore()
@@ -36,8 +37,12 @@ function fmt(n: number | null | undefined, digits = 0): string {
 function toPts(arr: { date: string; value: number }[] | undefined) {
   return (arr ?? []).slice(-20).map((p) => ({ label: p.date.slice(4, 6) + '/' + p.date.slice(6, 8), value: p.value }))
 }
-function toPtsUD(arr: { date: string; up: number; down: number }[] | undefined) {
-  return (arr ?? []).slice(-20).map((p) => ({ label: p.date.slice(4, 6) + '/' + p.date.slice(6, 8), value: p.up - p.down }))
+function toPtsUD(arr: { date: string; up: number; down: number | null }[] | undefined) {
+  // 跌停缺失日无法计算「涨停-跌停」净额：跳过该点，而不是把缺失当 0 造出一个高点
+  return (arr ?? [])
+    .filter((p) => p.up != null && p.down != null)
+    .slice(-20)
+    .map((p) => ({ label: p.date.slice(4, 6) + '/' + p.date.slice(6, 8), value: (p.up as number) - (p.down as number) }))
 }
 
 const canDraw = computed(() => {
@@ -51,23 +56,22 @@ const canDraw = computed(() => {
     <template v-if="daily">
       <h1 class="page-title">🏠 今日速览 · <span class="num">{{ store.formatDay(daily.trade_date) }}</span></h1>
       <p class="page-desc">两市核心资金指标 · 数据每日收盘后更新</p>
+      <SpotDataNotice />
 
       <div class="card-grid cols-4">
         <MetricCard
-          icon="💰" title="两市成交额" desc="沪深两市合计"
+          icon="💰" title="两市成交额" desc="沪深两市合计（市场级汇总，非股票样本统计）"
           :value="fmt(daily.overview.total_amount)" unit="亿"
           :sub="daily.overview.total_amount_rank_year
             ? `年内第 ${daily.overview.total_amount_rank_year} 名 · 历史 ${daily.overview.total_amount_pctile_all ?? '—'}%`
             : '排名待回补'"
-          :sample-n="N_ALL"
         />
         <MetricCard
-          icon="🏦" title="两融余额" desc="沪市+深市汇总"
+          icon="🏦" title="两融余额" desc="沪市+深市汇总（市场级总量，非股票样本统计）"
           :value="daily.overview.margin_balance != null ? fmt(daily.overview.margin_balance) : '—'" unit="亿"
           :sub="daily.overview.margin_rank_year
             ? `年内第 ${daily.overview.margin_rank_year} 名 · 历史 ${daily.overview.margin_pctile_all ?? '—'}%`
             : '两融数据延迟约1日'"
-          :sample-n="daily.overview.margin_balance != null ? N_YEAR : null"
         />
         <MetricCard
           icon="🔥" title="涨停 · 跌停" desc="剔除ST/北交所/次新"

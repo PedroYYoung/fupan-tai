@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { useDataStore } from '../stores/data'
+import { fmtBeijingTime } from '../lib/format'
 
 const store = useDataStore()
 const lastError = ref<string>('读取中…')
@@ -30,7 +31,7 @@ const nYear = computed(() => store.yearSampleN())
           <table class="data">
             <tbody>
               <tr><td>最新有效交易日</td><td class="num">{{ store.latest?.latest ?? '—' }}</td></tr>
-              <tr><td>最后更新时间</td><td class="num">{{ store.meta?.updated_at ?? '—' }}</td></tr>
+              <tr><td>最后更新时间（北京时间）</td><td class="num">{{ fmtBeijingTime(store.meta?.updated_at) }}</td></tr>
               <tr><td>下次计划更新</td><td>本地 18:40 / CI 19:30（北京时间，收盘后）</td></tr>
               <tr><td>当前展示日期</td><td class="num">{{ store.formatDay(store.currentDate) }}</td></tr>
             </tbody>

@@ -109,12 +109,15 @@ function emotionRule(d: DailyData): ConclusionItem & { score: number } {
   const e = d.emotion
   let text = '情绪平稳'
   let score = 15
-  let basis = `依据：涨停 ${e.limit_up} 家（历史${pctText(e.lu_pctile)}），跌停 ${e.limit_down} 家（历史${pctText(e.ld_pctile)}）`
+  const luText = e.limit_up == null ? '—' : `${e.limit_up} 家`
+  const ldText = e.limit_down == null ? '—' : `${e.limit_down} 家`
+  let basis = `依据：涨停 ${luText}（历史${pctText(e.lu_pctile)}），跌停 ${ldText}（历史${pctText(e.ld_pctile)}）`
   if (e.lu_pctile != null && e.lu_pctile > T.emotion.lu_pctile_high && e.ld_pctile != null && e.ld_pctile < T.emotion.ld_pctile_low) {
     text = '赚钱效应强，情绪高位'
     score = 28
   }
-  if (e.limit_down > T.emotion.ld_count_risk && e.ld_over10e.length >= T.emotion.ld_over10e_risk) {
+  if (e.limit_down != null && e.limit_down > T.emotion.ld_count_risk
+      && e.ld_over10e.length >= T.emotion.ld_over10e_risk) {
     text = `高位股杀跌，注意接力风险（10亿以上跌停 ${e.ld_over10e.length} 只）`
     score = 4
     basis += `；10亿以上跌停票：${e.ld_over10e.map((s) => s.name).join('、')}`

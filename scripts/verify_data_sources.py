@@ -94,7 +94,7 @@ def test_sina_realtime():
 
 def test_tencent_realtime():
     section("腾讯实时行情")
-    codes = "sh000001,sz399001,sz399006,sh000688,bj899050,sh000016,sh000300,sh600519,sz000858,sz300750"
+    codes = "sh000001,sz399001,sz399006,sh000688,sh000016,sh000300,sh600519,sz000858,sz300750"
     url = f"https://qt.gtimg.cn/q={codes}"
     try:
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
@@ -119,9 +119,9 @@ def test_tencent_realtime():
                     "len": len(f)}
             samples.append(info)
         # 校验：所有指数的行情日期必须与目标交易日一致（实时快照不能补造历史）
-        index_codes = {"sh000001", "sz399001", "sz399006", "sh000688", "bj899050", "sh000016", "sh000300"}
+        index_codes = {"sh000001", "sz399001", "sz399006", "sh000688", "sh000016", "sh000300"}
         date_ok = all(s.get("quote_date") == TARGET for s in samples if s["code"] in index_codes and s.get("quote_date"))
-        record("腾讯实时行情", url, len(samples) == 10 and date_ok,
+        record("腾讯实时行情", url, len(samples) == 9 and date_ok,
                {"samples": samples, "status": r.status_code},
                "f[1]名称 f[3]最新价 f[30]行情时间 f[32]涨跌幅 f[37]成交额(万元) f[44]流通市值(亿) f[45]总市值(亿)")
     except Exception as e:  # noqa: BLE001
