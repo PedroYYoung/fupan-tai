@@ -35,6 +35,15 @@ def _load(key):
         return json.load(f)
 
 
+def _recent_daily_dates(n=5):
+    """最近 n 个交易日（增量构建可能产生真实「0 家跌停」，不在回填清单内）。"""
+    daily_dir = os.path.join(DATA_DIR, "daily")
+    if not os.path.isdir(daily_dir):
+        return set()
+    files = sorted(f[:-5] for f in os.listdir(daily_dir) if f.endswith(".json"))
+    return set(files[-n:])
+
+
 # ---------------------------------------------------------------- 计算口径
 def _spot(n=1000):
     """构造：市值 1~1000 亿递增，成交额恒为 0.1 亿"""
@@ -162,20 +171,26 @@ def test_series_have_no_nontrading_points():
 def test_no_zero_limit_pool_values():
     """涨停/跌停家数写 0 只允许是真实「全市场无涨跌停」，接口失败必须写缺口
 
-    例外（2026-10-21 跌停缺口回填）：98 个缺口日经三重校验确认为真实 0 值，
-    日期清单已在序列 backfill.filled_dates 中声明。仅放行清单内的 0；
-    清单外任何 0 值（接口失败静默写 0 的形态）仍然失败。
+    例外 1（2026-10-21 跌停缺口回填）：98 个缺口日经三重校验确认为真实 0 值，
+    日期清单已在序列 backfill.filled_dates 中声明。
+    例外 2（增量构建）：最近几个交易日可能真实「0 家跌停」，由实时接口正常
+    返回空跌停池产生，不在回填清单内，属真实 0 而非失败写 0。
+    清单外 + 非近期的 0 值（接口失败静默写 0 的形态）仍然失败。
     """
     verified = set()
     with open(os.path.join(DATA_DIR, "series", "limit_down.json"), encoding="utf-8") as f:
         verified = set((json.load(f).get("backfill") or {}).get("filled_dates") or [])
+    recent = _recent_daily_dates(n=5)
     for key in ("limit_up_down", "limit_down"):
         zeros = [p["date"] for p in _load(key)["points"] if p.get("value") == 0]
         if key == "limit_down" and verified:
-            # 回填段 0 值必须与声明清单完全一致，不能多也不能少
-            assert set(zeros) == verified, (
-                f"limit_down 0 值日与 backfill.filled_dates 不一致："
-                f"未声明 {sorted(set(zeros) - verified)[:5]}，声明但非 0 {sorted(verified - set(zeros))[:5]}")
+            # 回填段自洽：filled_dates 必须是 0 值日的子集（不变量不变）
+            assert verified <= set(zeros), (
+                f"filled_dates 含非 0 值日：{sorted(verified - set(zeros))[:5]}")
+            # 清单外 + 非近期 = 非法（失败写 0）
+            unverified = [d for d in zeros if d not in verified and d not in recent]
+            assert not unverified, (
+                f"limit_down 存在未声明的 0 值日（疑似失败写 0）：{unverified[:5]}")
             continue
         assert not zeros, f"{key} 含 0 值点（疑似失败被写成 0）：{zeros[:5]}"
 
