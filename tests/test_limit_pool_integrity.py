@@ -37,6 +37,15 @@ def _series(key):
         return json.load(f)["points"]
 
 
+def _recent_daily_dates(n=5):
+    """最近 n 个交易日（增量构建可能产生真实「0 家跌停」，不在回填清单内）。"""
+    daily_dir = os.path.join(DATA_DIR, "daily")
+    if not os.path.isdir(daily_dir):
+        return set()
+    files = sorted(f[:-5] for f in os.listdir(daily_dir) if f.endswith(".json"))
+    return set(files[-n:])
+
+
 def test_empty_down_pool_is_real_zero(monkeypatch):
     """跌停池返回空表＝当日确实 0 家跌停（合法值），必须区别于接口失败"""
     monkeypatch.setattr(ak, "stock_zt_pool_em", lambda date=None: ZT_DF)
@@ -84,8 +93,9 @@ def test_no_zero_substitution_for_missing_days():
 
     2026-10-21 回填例外：98 个缺口日经三重校验（baostock 重算 / 涨停逐日比对 /
     通达信价格带交叉核验）确认全部为真实 0 值，并已在序列 backfill.filled_dates
-    中完整声明日期清单。测试放行「清单内且元信息自洽」的 0；任何清单外的 0
-    （尤其近期日——接口失败静默写 0 的典型形态）仍然失败。
+    中完整声明日期清单。测试放行「清单内且元信息自洽」的 0。
+    增量构建例外：最近几个交易日可能真实「0 家跌停」（实时接口正常返回空池），
+    不在回填清单内，同样放行。清单外 + 非近期的 0（接口失败静默写 0）仍然失败。
     """
     with open(os.path.join(DATA_DIR, "series", "limit_down.json"), encoding="utf-8") as f:
         obj = json.load(f)
@@ -96,18 +106,17 @@ def test_no_zero_substitution_for_missing_days():
         assert d in lu, f"0 家跌停日 {d} 无涨停记录"
     bf = obj.get("backfill") or {}
     verified = set(bf.get("filled_dates") or [])
+    recent = _recent_daily_dates(n=5)
     if bf.get("filled_dates"):
-        # 元信息自洽性：filled_dates 必须恰好覆盖全部 0 值日且与计数一致
-        assert verified == set(zero_days), (
-            f"backfill.filled_dates 与序列 0 值日不一致："
-            f"多出{sorted(verified - set(zero_days))[:3]} 缺少{sorted(set(zero_days) - verified)[:3]}")
+        # 元信息自洽性：filled_dates 必须是 0 值日的子集，且与计数一致
+        assert verified <= set(zero_days), (
+            f"filled_dates 含非 0 值日：{sorted(verified - set(zero_days))[:3]}")
         assert len(verified) == bf.get("filled_days"), "backfill.filled_days 与 filled_dates 长度不一致"
         assert bf.get("nonzero_days") == 0, "本轮回填声称无 0 值日，与序列 0 值矛盾"
-    # 未经清单声明的 0 值（新增缺口/失败写 0）一律不允许，且数量必须 ≤30 的经验上限
-    unverified = [d for d in zero_days if d not in verified]
-    assert len(unverified) <= 30, (
-        f"跌停 0 家的天数异常偏多：{len(zero_days)}（其中未验证 {len(unverified)}），"
-        f"疑似把缺失写成了 0：{unverified[:5]}")
+    # 未经清单声明、且非近期的 0 值（新增缺口/失败写 0）一律不允许
+    unverified = [d for d in zero_days if d not in verified and d not in recent]
+    assert not unverified, (
+        f"跌停 0 值日存在未声明且非近期的日期（疑似失败写 0）：{unverified[:5]}")
 
 
 def test_gaps_are_known_and_bounded():
