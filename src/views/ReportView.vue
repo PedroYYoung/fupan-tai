@@ -4,6 +4,7 @@ import { useDataStore } from '../stores/data'
 import { conclude, type BucketPt } from '../rules/engine'
 import { getNote, setNote } from '../lib/notesdb'
 import SpotDataNotice from '../components/SpotDataNotice.vue'
+import ReportExport from '../components/ReportExport.vue'
 
 const store = useDataStore()
 const daily = computed(() => store.daily)
@@ -23,15 +24,21 @@ watch(
 )
 const conclusion = computed(() => (daily.value ? conclude(daily.value, bucketPts.value) : null))
 
+// ---- 人工备注 ----
 const note = ref('')
 const savedTip = ref('')
 const exporting = ref(false)
 
-onMounted(async () => {
-  if (daily.value) {
-    try { note.value = await getNote(daily.value.trade_date) } catch { /* IndexedDB 不可用时静默降级 */ }
-  }
-})
+watch(
+  () => daily.value?.trade_date,
+  async (date) => {
+    note.value = ''
+    if (date) {
+      try { note.value = await getNote(date) } catch { /* IndexedDB 不可用时静默降级 */ }
+    }
+  },
+  { immediate: true }
+)
 
 async function saveNote() {
   if (!daily.value) return
@@ -44,6 +51,19 @@ async function saveNote() {
   }
 }
 
+async function clearNote() {
+  if (!daily.value) return
+  if (!window.confirm('确认清空该交易日的备注？此操作不可撤销。')) return
+  note.value = ''
+  try {
+    await setNote(daily.value.trade_date, '')
+    savedTip.value = '✅ 已清空该日期备注'
+    setTimeout(() => (savedTip.value = ''), 2500)
+  } catch {
+    savedTip.value = '⚠️ 本地存储不可用，清空未完成'
+  }
+}
+
 async function exportPng() {
   const el = document.getElementById('report-export')
   if (!el || !daily.value) return
@@ -51,11 +71,24 @@ async function exportPng() {
   try {
     const html2canvas = (await import('html2canvas')).default
     const canvas = await html2canvas(el, {
-      backgroundColor: '#0B0F14',
-      scale: 2,
-      width: 1200,
-      windowWidth: 1200,
-      useCORS: true
+      backgroundColor: '#FFFFFF',
+      scale: 1,
+      useCORS: true,
+      onclone: (clonedDoc) => {
+        // 导出白底：背景纯白、默认文字深色；保留 .up(红)/.down(绿) 语义色
+        const root = clonedDoc.getElementById('report-export')
+        if (!root) return
+        root.style.background = '#FFFFFF'
+        root.style.color = '#111418'
+        root.querySelectorAll('*').forEach((n) => {
+          const e = n as HTMLElement
+          if (e.classList.contains('up')) { e.style.color = '#C0392B'; return }
+          if (e.classList.contains('down')) { e.style.color = '#1E8449'; return }
+          e.style.color = '#111418'
+          e.style.background = 'transparent'
+          e.style.borderColor = '#E5E7EB'
+        })
+      }
     })
     const a = document.createElement('a')
     a.download = `复盘报告_${daily.value.trade_date}.png`
@@ -65,11 +98,6 @@ async function exportPng() {
     exporting.value = false
   }
 }
-
-function fmt(n: number | null | undefined, digits = 0): string {
-  if (n == null) return '—'
-  return n.toLocaleString('zh-CN', { maximumFractionDigits: digits, minimumFractionDigits: digits })
-}
 </script>
 
 <template>
@@ -77,7 +105,7 @@ function fmt(n: number | null | undefined, digits = 0): string {
     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
       <div>
         <h1 class="page-title">📋 复盘报告 · <span class="num">{{ daily ? store.formatDay(daily.trade_date) : '—' }}</span></h1>
-        <p class="page-desc">关键指标总表 + 自动结论，可直接截图或导出 PNG 转发</p>
+        <p class="page-desc">资金 · 结构 · 情绪三维复盘，可直接截图或导出 PNG 转发</p>
         <SpotDataNotice />
       </div>
       <button class="btn" :disabled="exporting || !daily" @click="exportPng">
@@ -85,84 +113,21 @@ function fmt(n: number | null | undefined, digits = 0): string {
       </button>
     </div>
 
-    <div v-if="daily && conclusion" id="report-export">
-      <div class="card" style="margin-bottom:14px">
-        <div class="card-title">📊 当日关键指标总表</div>
-        <div class="table-wrap">
-          <table class="data">
-            <thead>
-              <tr><th>指标</th><th>数值</th><th>年内排名</th><th>历史百分位</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>两市成交额</td>
-                <td class="num">{{ fmt(daily.overview.total_amount) }} 亿</td>
-                <td class="num">{{ daily.overview.total_amount_rank_year ?? '—' }}</td>
-                <td class="num">{{ daily.overview.total_amount_pctile_all != null ? daily.overview.total_amount_pctile_all + '%' : '—' }}</td>
-              </tr>
-              <tr>
-                <td>两融余额</td>
-                <td class="num">{{ daily.overview.margin_balance != null ? fmt(daily.overview.margin_balance) + ' 亿' : '—' }}</td>
-                <td class="num">{{ daily.overview.margin_rank_year ?? '—' }}</td>
-                <td class="num">{{ daily.overview.margin_pctile_all != null ? daily.overview.margin_pctile_all + '%' : '—' }}</td>
-              </tr>
-              <tr>
-                <td>涨停家数</td>
-                <td class="num up">{{ fmt(daily.overview.limit_up) }}</td>
-                <td class="muted">—</td>
-                <td class="num">{{ daily.emotion.lu_pctile != null ? daily.emotion.lu_pctile + '%' : '—' }}</td>
-              </tr>
-              <tr>
-                <td>跌停家数</td>
-                <td class="num down">{{ fmt(daily.overview.limit_down) }}</td>
-                <td class="muted">—</td>
-                <td class="num">{{ daily.emotion.ld_pctile != null ? daily.emotion.ld_pctile + '%' : '—' }}</td>
-              </tr>
-              <tr>
-                <td>10亿以上家数</td>
-                <td class="num">{{ fmt(daily.overview.over_10e_count) }} 家</td>
-                <td class="muted">—</td>
-                <td class="num">{{ daily.liquidity.pctile_count != null ? daily.liquidity.pctile_count + '%' : '—' }}</td>
-              </tr>
-              <tr>
-                <td>前10成交占比</td>
-                <td class="num">{{ daily.concentration.top10_total != null ? fmt(daily.concentration.top10_total, 1) + "%" : "—" }}</td>
-                <td class="muted">—</td>
-                <td class="num">{{ daily.concentration.top10_total_pctile_hist != null ? daily.concentration.top10_total_pctile_hist + '%' : '—' }}</td>
-              </tr>
-              <tr>
-                <td>个股总数</td>
-                <td class="num">{{ fmt(daily.overview.stock_count) }}</td>
-                <td class="muted">—</td>
-                <td class="muted">—</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+    <ReportExport
+      v-if="daily && conclusion"
+      :daily="daily"
+      :conclusion="conclusion"
+      :note="note"
+      :updated-at="store.latest?.updated_at"
+    />
 
-      <div class="card" style="margin-bottom:14px">
-        <div class="card-title">🤖 自动结论（评分 {{ conclusion.score }}/100）</div>
-        <div class="conclusion-box" style="margin:10px 0 0">
-          <strong>💰 资金：</strong>{{ conclusion.fund.text }}
-          <div class="basis">{{ conclusion.fund.basis }}</div>
-        </div>
-        <div class="conclusion-box" style="margin:10px 0 0">
-          <strong>🧩 结构：</strong>{{ conclusion.structure.text }}
-          <div class="basis">{{ conclusion.structure.basis }}</div>
-        </div>
-        <div class="conclusion-box" style="margin:10px 0 0">
-          <strong>🔥 情绪：</strong>{{ conclusion.emotion.text }}
-          <div class="basis">{{ conclusion.emotion.basis }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" v-if="daily">
-      <div class="card-title">✏️ 手动备注（仅存本地 IndexedDB）</div>
-      <textarea v-model="note" class="note-input" style="margin-top:10px" placeholder="记录今日操作、思路、明日计划……"></textarea>
-      <div style="margin-top:10px; display:flex; gap:10px; align-items:center;">
+    <!-- 人工备注编辑区（不进入导出） -->
+    <div class="card" v-if="daily" style="margin-top:14px">
+      <div class="card-title">✏️ 人工备注（仅存本地 IndexedDB，按交易日独立保存）</div>
+      <textarea v-model="note" class="note-input" style="margin-top:10px" placeholder="记录今日市场观察、个人判断、明日计划……"></textarea>
+      <div style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
         <button class="btn secondary" @click="saveNote">保存备注</button>
+        <button class="btn secondary" @click="clearNote">清空备注</button>
         <span class="muted" style="font-size:12px">{{ savedTip }}</span>
       </div>
     </div>

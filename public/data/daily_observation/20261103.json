@@ -1,0 +1,422 @@
+{
+  "trade_date": "20261103",
+  "generated_at": "2026-11-09T01:43:18+08:00",
+  "market_metrics": {
+    "total_amount": {
+      "value": 17034.37,
+      "change": -802.58,
+      "change_pct": -4.5,
+      "unit": "亿元"
+    },
+    "limit_up": {
+      "value": 48,
+      "change": -77,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "limit_down": {
+      "value": 17,
+      "change": 9,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "over_10e_count": {
+      "value": 361,
+      "change": -21,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "top10_pct": {
+      "value": 8.14,
+      "change": 1.52,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "top20_pct": {
+      "value": 11.95,
+      "change": 1.68,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "top50_pct": {
+      "value": 19.1,
+      "change": 1.83,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "margin_balance": {
+      "value": 23232.96,
+      "change": null,
+      "change_pct": null,
+      "unit": "亿元",
+      "stat_date": "20261102"
+    },
+    "stock_count": {
+      "value": 5570,
+      "change": null,
+      "change_pct": null,
+      "unit": "家"
+    }
+  },
+  "market_summary": "两市成交额 17034 亿元，较上一交易日缩量 803 亿元（-4.5%），交投趋于谨慎。涨停 48 家、跌停 17 家（涨停较上一交易日减少 77 家）。涨停家数明显多于跌停，赚钱效应占优。成交额超 10 亿元个股 361 家（减少 21 家）。前 10 大个股成交占比 8.1%（较上一交易日上升 1.52 个百分点）。",
+  "sector_resonance": {
+    "board": {
+      "name": "保险",
+      "category": "行业",
+      "change": 2.67,
+      "relative_strength": 3.65,
+      "up_ratio": null,
+      "amount": 108.2,
+      "amount_change": null,
+      "limit_up_count": null,
+      "limit_up_density": null,
+      "valid_count": 2,
+      "indicators": {
+        "board_change": {
+          "label": "板块涨幅",
+          "weight": 0.2,
+          "value": 2.67,
+          "valid": true,
+          "pctile": 100.0
+        },
+        "relative_strength": {
+          "label": "相对大盘强度",
+          "weight": 0.2,
+          "value": 3.65,
+          "valid": true,
+          "pctile": 100.0
+        },
+        "up_ratio": {
+          "label": "上涨家数占比",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        },
+        "amount_change": {
+          "label": "成交额变化",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        },
+        "limit_up_density": {
+          "label": "涨停密度",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        }
+      },
+      "raw_score": 100.0,
+      "representative_stocks": [],
+      "representative_note": "板块成分股映射未接入，暂无法提供该板块内的代表性个股；"
+    },
+    "benchmark": -0.98,
+    "benchmark_name": "中证全指(沪深合计代理)",
+    "note": "v1 行业共振为「可用指标简版」：上涨家数占比、涨停密度需板块成分股数据，当前未接入，故最多 3/5 项有效，未达「≥4 项入主榜」的完整共振门槛，评分仅供参考，不得视为完整共振结论。概念板块未采集。",
+    "qualified_full": false
+  },
+  "sector_rankings": {
+    "industry": {
+      "red": [
+        {
+          "name": "保险",
+          "change": 2.67,
+          "amount": 108.2,
+          "ratio": 0.64,
+          "amount_change": null
+        },
+        {
+          "name": "机场航运",
+          "change": 2.01,
+          "amount": 55.6,
+          "ratio": 0.33,
+          "amount_change": null
+        },
+        {
+          "name": "养殖业",
+          "change": 1.89,
+          "amount": 79.0,
+          "ratio": 0.46,
+          "amount_change": null
+        },
+        {
+          "name": "贸易",
+          "change": 1.81,
+          "amount": 17.3,
+          "ratio": 0.1,
+          "amount_change": null
+        },
+        {
+          "name": "电池",
+          "change": 1.64,
+          "amount": 581.2,
+          "ratio": 3.41,
+          "amount_change": null
+        },
+        {
+          "name": "白酒",
+          "change": 1.57,
+          "amount": 230.7,
+          "ratio": 1.35,
+          "amount_change": -67.8
+        },
+        {
+          "name": "游戏",
+          "change": 1.45,
+          "amount": 157.9,
+          "ratio": 0.93,
+          "amount_change": 8.1
+        },
+        {
+          "name": "影视院线",
+          "change": 1.44,
+          "amount": 150.6,
+          "ratio": 0.88,
+          "amount_change": 7.2
+        },
+        {
+          "name": "农产品加工",
+          "change": 1.36,
+          "amount": 78.3,
+          "ratio": 0.46,
+          "amount_change": null
+        },
+        {
+          "name": "钢铁",
+          "change": 1.33,
+          "amount": 60.7,
+          "ratio": 0.36,
+          "amount_change": null
+        }
+      ],
+      "black": [
+        {
+          "name": "元件",
+          "change": -5.13,
+          "amount": 879.3,
+          "ratio": 5.16,
+          "amount_change": null
+        },
+        {
+          "name": "半导体",
+          "change": -5.09,
+          "amount": 1977.5,
+          "ratio": 11.61,
+          "amount_change": null
+        },
+        {
+          "name": "电子化学品",
+          "change": -5.05,
+          "amount": 207.9,
+          "ratio": 1.22,
+          "amount_change": null
+        },
+        {
+          "name": "通信设备",
+          "change": -4.53,
+          "amount": 1106.7,
+          "ratio": 6.5,
+          "amount_change": null
+        },
+        {
+          "name": "自动化设备",
+          "change": -4.0,
+          "amount": 373.4,
+          "ratio": 2.19,
+          "amount_change": null
+        },
+        {
+          "name": "医疗服务",
+          "change": -3.57,
+          "amount": 292.5,
+          "ratio": 1.72,
+          "amount_change": null
+        },
+        {
+          "name": "通用设备",
+          "change": -2.92,
+          "amount": 517.0,
+          "ratio": 3.04,
+          "amount_change": null
+        },
+        {
+          "name": "其他电子",
+          "change": -2.88,
+          "amount": 114.3,
+          "ratio": 0.67,
+          "amount_change": null
+        },
+        {
+          "name": "消费电子",
+          "change": -2.58,
+          "amount": 361.2,
+          "ratio": 2.12,
+          "amount_change": null
+        },
+        {
+          "name": "塑料制品",
+          "change": -2.38,
+          "amount": 188.9,
+          "ratio": 1.11,
+          "amount_change": null
+        }
+      ],
+      "source": "ths",
+      "note": "口径：同花顺行业板块当日数据",
+      "as_of": null
+    },
+    "concept": {
+      "red": null,
+      "black": null,
+      "note": "概念板块数据尚未接入，暂不生成概念红黑榜。"
+    }
+  },
+  "stock_rankings": {
+    "red": [
+      {
+        "code": "001381",
+        "name": "N皇冠",
+        "change_pct": 397.94,
+        "amount": 26.53,
+        "is_limit_up": false
+      },
+      {
+        "code": "300010",
+        "name": "ST豆神",
+        "change_pct": 19.94,
+        "amount": 6.3,
+        "is_limit_up": false
+      },
+      {
+        "code": "301311",
+        "name": "昆船智能",
+        "change_pct": 18.08,
+        "amount": 6.35,
+        "is_limit_up": false
+      },
+      {
+        "code": "300426",
+        "name": "华智数媒",
+        "change_pct": 16.28,
+        "amount": 8.69,
+        "is_limit_up": false
+      },
+      {
+        "code": "301487",
+        "name": "盟固利",
+        "change_pct": 13.51,
+        "amount": 16.45,
+        "is_limit_up": false
+      },
+      {
+        "code": "300739",
+        "name": "明阳电路",
+        "change_pct": 12.46,
+        "amount": 13.95,
+        "is_limit_up": false
+      }
+    ],
+    "black": [
+      {
+        "code": "301428",
+        "name": "世纪恒通",
+        "change": -20.0,
+        "amount": 10.68,
+        "board": "主板"
+      },
+      {
+        "code": "603278",
+        "name": "大业股份",
+        "change": -10.017074584960938,
+        "amount": 15.27,
+        "board": "主板"
+      },
+      {
+        "code": "002851",
+        "name": "麦格米特",
+        "change": -10.00374698638916,
+        "amount": 21.5,
+        "board": "主板"
+      },
+      {
+        "code": "001309",
+        "name": "德明利",
+        "change": -10.00096321105957,
+        "amount": 43.56,
+        "board": "主板"
+      },
+      {
+        "code": "002916",
+        "name": "深南电路",
+        "change": -10.000877380371094,
+        "amount": 28.86,
+        "board": "主板"
+      },
+      {
+        "code": "603228",
+        "name": "景旺电子",
+        "change": -10.0,
+        "amount": 20.01,
+        "board": "主板"
+      }
+    ],
+    "note": "个股红榜取当日「成交额≥5亿且涨幅≥5%」的高活跃上涨股；黑榜取「跌停且成交额≥10亿」个股。全市场涨跌个股榜需全市场快照，当前未接入。"
+  },
+  "risk_events": {
+    "events": [],
+    "coverage_status": "unavailable",
+    "message": "上市公司公告、交易所监管及权威媒体等风险事件来源尚未接入，本日风险事件覆盖不完整，无法判定「无风险事件」。",
+    "sources": [
+      {
+        "name": "巨潮资讯网",
+        "url": "https://www.cninfo.com.cn/",
+        "status": "未接入"
+      },
+      {
+        "name": "上交所披露",
+        "url": "https://www.sse.com.cn/disclosure/listedinfo/announcement/",
+        "status": "未接入"
+      },
+      {
+        "name": "深交所披露",
+        "url": "https://www.szse.cn/disclosure/",
+        "status": "未接入"
+      }
+    ]
+  },
+  "summary": "市场整体收跌（全A基准 -0.98%）。资金面降温，量能收缩。共振方向落在 行业「保险」（涨幅 +2.67%，相对大盘 +3.65%），为当日相对强势方向。行业层面 保险 领涨、元件 领跌，结构分化明显。上市公司公告、交易所监管及权威媒体等风险事件来源尚未接入，本日风险事件覆盖不完整，无法判定「无风险事件」。以上为基于当日真实行情数据与确定性规则的自动观察，仅供复盘参考，不构成任何买卖建议。",
+  "source_coverage": {
+    "core_metrics": {
+      "status": "available",
+      "detail": "两市成交额、涨跌停、10亿以上家数、集中度、两融来自现有每日快照。"
+    },
+    "industry_board": {
+      "status": "available",
+      "detail": "行业板块涨跌 Top10（源：ths），仅含涨幅与成交额。"
+    },
+    "concept_board": {
+      "status": "unavailable",
+      "detail": "概念板块数据尚未接入。"
+    },
+    "board_constituents": {
+      "status": "unavailable",
+      "detail": "板块成分股映射尚未接入，上涨家数占比、涨停密度无法计算。"
+    },
+    "advance_decline": {
+      "status": "unavailable",
+      "detail": "全市场上涨/下跌家数需全市场快照，当前快照未落盘该字段。"
+    },
+    "risk_events": {
+      "status": "unavailable",
+      "detail": "上市公司公告（巨潮）、交易所监管、权威媒体等来源尚未接入。"
+    }
+  },
+  "data_warnings": [
+    "共振评分为「可用指标简版」（≤3/5 项有效），未达完整共振门槛，仅供参考。",
+    "个股红榜取当日「成交额≥5亿且涨幅≥5%」的高活跃上涨股；黑榜取「跌停且成交额≥10亿」个股。全市场涨跌个股榜需全市场快照，当前未接入。"
+  ],
+  "ai_generated": false,
+  "generation_mode": "规则自动生成（未接入 AI Provider）"
+}

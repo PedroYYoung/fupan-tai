@@ -1,0 +1,331 @@
+{
+  "trade_date": "20261021",
+  "generated_at": "2026-11-09T01:43:18+08:00",
+  "market_metrics": {
+    "total_amount": {
+      "value": 14293.49,
+      "change": -267.63,
+      "change_pct": -1.84,
+      "unit": "亿元"
+    },
+    "limit_up": {
+      "value": 50,
+      "change": -4,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "limit_down": {
+      "value": 5,
+      "change": -1,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "over_10e_count": {
+      "value": 295,
+      "change": 1,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "top10_pct": {
+      "value": 8.13,
+      "change": 0.27,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "top20_pct": {
+      "value": 11.97,
+      "change": 0.64,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "top50_pct": {
+      "value": 19.35,
+      "change": 0.61,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "margin_balance": {
+      "value": 24712.5,
+      "change": null,
+      "change_pct": null,
+      "unit": "亿元",
+      "stat_date": "20261021"
+    },
+    "stock_count": {
+      "value": 5224,
+      "change": null,
+      "change_pct": null,
+      "unit": "家"
+    }
+  },
+  "market_summary": "两市成交额 14293 亿元，较上一交易日缩量 268 亿元（-1.8%），交投趋于谨慎。涨停 50 家、跌停 5 家（涨停较上一交易日减少 4 家）。涨停家数明显多于跌停，赚钱效应占优。成交额超 10 亿元个股 295 家（增加 1 家）。前 10 大个股成交占比 8.1%（较上一交易日上升 0.27 个百分点）。",
+  "sector_resonance": {
+    "board": {
+      "name": "电机",
+      "category": "行业",
+      "change": 4.3,
+      "relative_strength": null,
+      "up_ratio": null,
+      "amount": 74.3,
+      "amount_change": null,
+      "limit_up_count": null,
+      "limit_up_density": null,
+      "valid_count": 1,
+      "indicators": {
+        "board_change": {
+          "label": "板块涨幅",
+          "weight": 0.2,
+          "value": 4.3,
+          "valid": true,
+          "pctile": 100.0
+        },
+        "relative_strength": {
+          "label": "相对大盘强度",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        },
+        "up_ratio": {
+          "label": "上涨家数占比",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        },
+        "amount_change": {
+          "label": "成交额变化",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        },
+        "limit_up_density": {
+          "label": "涨停密度",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        }
+      },
+      "raw_score": 100.0,
+      "representative_stocks": [],
+      "representative_note": "板块成分股映射未接入，暂无法提供该板块内的代表性个股；"
+    },
+    "benchmark": null,
+    "benchmark_name": "中证全指(沪深合计代理)",
+    "note": "v1 行业共振为「可用指标简版」：上涨家数占比、涨停密度需板块成分股数据，当前未接入，故最多 3/5 项有效，未达「≥4 项入主榜」的完整共振门槛，评分仅供参考，不得视为完整共振结论。概念板块未采集。",
+    "qualified_full": false
+  },
+  "sector_rankings": {
+    "industry": {
+      "red": [
+        {
+          "name": "电机",
+          "change": 4.3,
+          "amount": 74.3,
+          "ratio": 0.49,
+          "amount_change": null
+        },
+        {
+          "name": "工程机械",
+          "change": 0.47,
+          "amount": 62.1,
+          "ratio": 0.41,
+          "amount_change": 5.8
+        }
+      ],
+      "black": [
+        {
+          "name": "影视院线",
+          "change": -6.52,
+          "amount": 95.0,
+          "ratio": 0.62,
+          "amount_change": null
+        },
+        {
+          "name": "文化传媒",
+          "change": -5.6,
+          "amount": 396.4,
+          "ratio": 2.6,
+          "amount_change": null
+        },
+        {
+          "name": "元件",
+          "change": -5.38,
+          "amount": 796.3,
+          "ratio": 5.22,
+          "amount_change": null
+        },
+        {
+          "name": "教育",
+          "change": -5.14,
+          "amount": 19.3,
+          "ratio": 0.13,
+          "amount_change": null
+        },
+        {
+          "name": "互联网电商",
+          "change": -4.85,
+          "amount": 51.9,
+          "ratio": 0.34,
+          "amount_change": null
+        },
+        {
+          "name": "游戏",
+          "change": -4.57,
+          "amount": 83.2,
+          "ratio": 0.54,
+          "amount_change": null
+        },
+        {
+          "name": "电子化学品",
+          "change": -4.33,
+          "amount": 193.1,
+          "ratio": 1.27,
+          "amount_change": null
+        },
+        {
+          "name": "医疗服务",
+          "change": -4.26,
+          "amount": 259.0,
+          "ratio": 1.7,
+          "amount_change": -7.7
+        },
+        {
+          "name": "贵金属",
+          "change": -4.18,
+          "amount": 157.4,
+          "ratio": 1.03,
+          "amount_change": null
+        },
+        {
+          "name": "种植业与林业",
+          "change": -4.12,
+          "amount": 65.0,
+          "ratio": 0.43,
+          "amount_change": null
+        }
+      ],
+      "source": "ths",
+      "note": "口径：同花顺行业板块当日数据",
+      "as_of": null
+    },
+    "concept": {
+      "red": null,
+      "black": null,
+      "note": "概念板块数据尚未接入，暂不生成概念红黑榜。"
+    }
+  },
+  "stock_rankings": {
+    "red": [
+      {
+        "code": "300839",
+        "name": "博汇股份",
+        "change_pct": 20.0,
+        "amount": 8.13,
+        "is_limit_up": false
+      },
+      {
+        "code": "301563",
+        "name": "云汉芯城",
+        "change_pct": 16.16,
+        "amount": 6.19,
+        "is_limit_up": false
+      },
+      {
+        "code": "301413",
+        "name": "安培龙",
+        "change_pct": 14.6,
+        "amount": 9.06,
+        "is_limit_up": false
+      },
+      {
+        "code": "002076",
+        "name": "星光股份",
+        "change_pct": 10.2,
+        "amount": 9.87,
+        "is_limit_up": true
+      },
+      {
+        "code": "002307",
+        "name": "北新路桥",
+        "change_pct": 10.06,
+        "amount": 6.97,
+        "is_limit_up": false
+      },
+      {
+        "code": "600202",
+        "name": "哈空调",
+        "change_pct": 10.05,
+        "amount": 6.57,
+        "is_limit_up": true
+      }
+    ],
+    "black": [
+      {
+        "code": "000712",
+        "name": "锦龙股份",
+        "change": -10.018552780151367,
+        "amount": 12.36,
+        "board": "主板"
+      }
+    ],
+    "note": "个股红榜取当日「成交额≥5亿且涨幅≥5%」的高活跃上涨股；黑榜取「跌停且成交额≥10亿」个股。全市场涨跌个股榜需全市场快照，当前未接入。"
+  },
+  "risk_events": {
+    "events": [],
+    "coverage_status": "unavailable",
+    "message": "上市公司公告、交易所监管及权威媒体等风险事件来源尚未接入，本日风险事件覆盖不完整，无法判定「无风险事件」。",
+    "sources": [
+      {
+        "name": "巨潮资讯网",
+        "url": "https://www.cninfo.com.cn/",
+        "status": "未接入"
+      },
+      {
+        "name": "上交所披露",
+        "url": "https://www.sse.com.cn/disclosure/listedinfo/announcement/",
+        "status": "未接入"
+      },
+      {
+        "name": "深交所披露",
+        "url": "https://www.szse.cn/disclosure/",
+        "status": "未接入"
+      }
+    ]
+  },
+  "summary": "资金面降温，量能收缩。共振方向落在 行业「电机」（涨幅 +4.30%），为当日相对强势方向。行业层面 电机 领涨、影视院线 领跌，结构分化明显。上市公司公告、交易所监管及权威媒体等风险事件来源尚未接入，本日风险事件覆盖不完整，无法判定「无风险事件」。以上为基于当日真实行情数据与确定性规则的自动观察，仅供复盘参考，不构成任何买卖建议。",
+  "source_coverage": {
+    "core_metrics": {
+      "status": "available",
+      "detail": "两市成交额、涨跌停、10亿以上家数、集中度、两融来自现有每日快照。"
+    },
+    "industry_board": {
+      "status": "available",
+      "detail": "行业板块涨跌 Top10（源：ths），仅含涨幅与成交额。"
+    },
+    "concept_board": {
+      "status": "unavailable",
+      "detail": "概念板块数据尚未接入。"
+    },
+    "board_constituents": {
+      "status": "unavailable",
+      "detail": "板块成分股映射尚未接入，上涨家数占比、涨停密度无法计算。"
+    },
+    "advance_decline": {
+      "status": "unavailable",
+      "detail": "全市场上涨/下跌家数需全市场快照，当前快照未落盘该字段。"
+    },
+    "risk_events": {
+      "status": "unavailable",
+      "detail": "上市公司公告（巨潮）、交易所监管、权威媒体等来源尚未接入。"
+    }
+  },
+  "data_warnings": [
+    "共振评分为「可用指标简版」（≤3/5 项有效），未达完整共振门槛，仅供参考。",
+    "个股红榜取当日「成交额≥5亿且涨幅≥5%」的高活跃上涨股；黑榜取「跌停且成交额≥10亿」个股。全市场涨跌个股榜需全市场快照，当前未接入。",
+    "全A基准涨跌缺失，相对大盘强度不可计算。"
+  ],
+  "ai_generated": false,
+  "generation_mode": "规则自动生成（未接入 AI Provider）"
+}

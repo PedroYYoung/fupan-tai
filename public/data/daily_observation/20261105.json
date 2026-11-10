@@ -1,0 +1,352 @@
+{
+  "trade_date": "20261105",
+  "generated_at": "2026-11-09T01:43:18+08:00",
+  "market_metrics": {
+    "total_amount": {
+      "value": 21179.53,
+      "change": 802.59,
+      "change_pct": 3.94,
+      "unit": "亿元"
+    },
+    "limit_up": {
+      "value": 84,
+      "change": -34,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "limit_down": {
+      "value": 0,
+      "change": -10,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "over_10e_count": {
+      "value": 463,
+      "change": 22,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "top10_pct": {
+      "value": 7.7,
+      "change": 0.09,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "top20_pct": {
+      "value": 11.48,
+      "change": 0.12,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "top50_pct": {
+      "value": 18.99,
+      "change": 0.23,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "margin_balance": {
+      "value": 22913.86,
+      "change": null,
+      "change_pct": null,
+      "unit": "亿元",
+      "stat_date": "20261103"
+    },
+    "stock_count": {
+      "value": 5571,
+      "change": null,
+      "change_pct": null,
+      "unit": "家"
+    }
+  },
+  "market_summary": "两市成交额 21180 亿元，较上一交易日放量 803 亿元（+3.9%），资金参与度提升。涨停 84 家、跌停 0 家（涨停较上一交易日减少 34 家）。涨停家数明显多于跌停，赚钱效应占优。成交额超 10 亿元个股 463 家（增加 22 家）。前 10 大个股成交占比 7.7%（较上一交易日上升 0.09 个百分点）。",
+  "sector_resonance": {
+    "board": {
+      "name": "光伏设备",
+      "category": "行业",
+      "change": 8.02,
+      "relative_strength": 6.76,
+      "up_ratio": null,
+      "amount": 561.5,
+      "amount_change": 213.6,
+      "limit_up_count": null,
+      "limit_up_density": null,
+      "valid_count": 3,
+      "indicators": {
+        "board_change": {
+          "label": "板块涨幅",
+          "weight": 0.2,
+          "value": 8.02,
+          "valid": true,
+          "pctile": 100.0
+        },
+        "relative_strength": {
+          "label": "相对大盘强度",
+          "weight": 0.2,
+          "value": 6.76,
+          "valid": true,
+          "pctile": 100.0
+        },
+        "up_ratio": {
+          "label": "上涨家数占比",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        },
+        "amount_change": {
+          "label": "成交额变化",
+          "weight": 0.2,
+          "value": 213.6,
+          "valid": true,
+          "pctile": 100.0
+        },
+        "limit_up_density": {
+          "label": "涨停密度",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        }
+      },
+      "raw_score": 100.0,
+      "representative_stocks": [],
+      "representative_note": "板块成分股映射未接入，暂无法提供该板块内的代表性个股；"
+    },
+    "benchmark": 1.26,
+    "benchmark_name": "中证全指(沪深合计代理)",
+    "note": "v1 行业共振为「可用指标简版」：上涨家数占比、涨停密度需板块成分股数据，当前未接入，故最多 3/5 项有效，未达「≥4 项入主榜」的完整共振门槛，评分仅供参考，不得视为完整共振结论。概念板块未采集。",
+    "qualified_full": false
+  },
+  "sector_rankings": {
+    "industry": {
+      "red": [
+        {
+          "name": "光伏设备",
+          "change": 8.02,
+          "amount": 561.5,
+          "ratio": 2.65,
+          "amount_change": 213.6
+        },
+        {
+          "name": "贵金属",
+          "change": 4.95,
+          "amount": 350.2,
+          "ratio": 1.65,
+          "amount_change": 64.1
+        },
+        {
+          "name": "影视院线",
+          "change": 4.57,
+          "amount": 174.9,
+          "ratio": 0.83,
+          "amount_change": null
+        },
+        {
+          "name": "能源金属",
+          "change": 4.27,
+          "amount": 159.2,
+          "ratio": 0.75,
+          "amount_change": null
+        },
+        {
+          "name": "文化传媒",
+          "change": 4.21,
+          "amount": 594.7,
+          "ratio": 2.81,
+          "amount_change": null
+        },
+        {
+          "name": "互联网电商",
+          "change": 4.21,
+          "amount": 58.7,
+          "ratio": 0.28,
+          "amount_change": null
+        },
+        {
+          "name": "通信服务",
+          "change": 3.96,
+          "amount": 162.6,
+          "ratio": 0.77,
+          "amount_change": null
+        },
+        {
+          "name": "电池",
+          "change": 3.78,
+          "amount": 842.5,
+          "ratio": 3.98,
+          "amount_change": null
+        },
+        {
+          "name": "消费电子",
+          "change": 3.59,
+          "amount": 528.0,
+          "ratio": 2.49,
+          "amount_change": null
+        },
+        {
+          "name": "IT服务",
+          "change": 3.58,
+          "amount": 413.1,
+          "ratio": 1.95,
+          "amount_change": null
+        }
+      ],
+      "black": [
+        {
+          "name": "煤炭开采加工",
+          "change": -1.38,
+          "amount": 159.3,
+          "ratio": 0.75,
+          "amount_change": null
+        },
+        {
+          "name": "油气开采及服务",
+          "change": -1.03,
+          "amount": 71.3,
+          "ratio": 0.34,
+          "amount_change": 8.7
+        },
+        {
+          "name": "银行",
+          "change": -0.73,
+          "amount": 397.4,
+          "ratio": 1.88,
+          "amount_change": -39.2
+        },
+        {
+          "name": "港口航运",
+          "change": -0.7,
+          "amount": 115.1,
+          "ratio": 0.54,
+          "amount_change": null
+        },
+        {
+          "name": "元件",
+          "change": -0.36,
+          "amount": 1035.2,
+          "ratio": 4.89,
+          "amount_change": -43.3
+        },
+        {
+          "name": "证券",
+          "change": -0.24,
+          "amount": 225.2,
+          "ratio": 1.06,
+          "amount_change": null
+        }
+      ],
+      "source": "ths",
+      "note": "口径：同花顺行业板块当日数据",
+      "as_of": null
+    },
+    "concept": {
+      "red": null,
+      "black": null,
+      "note": "概念板块数据尚未接入，暂不生成概念红黑榜。"
+    }
+  },
+  "stock_rankings": {
+    "red": [
+      {
+        "code": "300071",
+        "name": "福石控股",
+        "change_pct": 20.05,
+        "amount": 12.2,
+        "is_limit_up": true
+      },
+      {
+        "code": "300709",
+        "name": "精研科技",
+        "change_pct": 20.01,
+        "amount": 11.05,
+        "is_limit_up": true
+      },
+      {
+        "code": "300049",
+        "name": "福瑞医科",
+        "change_pct": 20.0,
+        "amount": 9.93,
+        "is_limit_up": true
+      },
+      {
+        "code": "300493",
+        "name": "润欣科技",
+        "change_pct": 19.97,
+        "amount": 6.71,
+        "is_limit_up": true
+      },
+      {
+        "code": "688227",
+        "name": "品高股份",
+        "change_pct": 16.87,
+        "amount": 5.1,
+        "is_limit_up": false
+      },
+      {
+        "code": "300751",
+        "name": "迈为股份",
+        "change_pct": 16.16,
+        "amount": 27.59,
+        "is_limit_up": false
+      }
+    ],
+    "black": [],
+    "note": "个股红榜取当日「成交额≥5亿且涨幅≥5%」的高活跃上涨股；黑榜取「跌停且成交额≥10亿」个股。全市场涨跌个股榜需全市场快照，当前未接入。"
+  },
+  "risk_events": {
+    "events": [],
+    "coverage_status": "unavailable",
+    "message": "上市公司公告、交易所监管及权威媒体等风险事件来源尚未接入，本日风险事件覆盖不完整，无法判定「无风险事件」。",
+    "sources": [
+      {
+        "name": "巨潮资讯网",
+        "url": "https://www.cninfo.com.cn/",
+        "status": "未接入"
+      },
+      {
+        "name": "上交所披露",
+        "url": "https://www.sse.com.cn/disclosure/listedinfo/announcement/",
+        "status": "未接入"
+      },
+      {
+        "name": "深交所披露",
+        "url": "https://www.szse.cn/disclosure/",
+        "status": "未接入"
+      }
+    ]
+  },
+  "summary": "市场整体收涨（全A基准 +1.26%）。资金面回暖，量能放大。共振方向落在 行业「光伏设备」（涨幅 +8.02%，相对大盘 +6.76%），为当日相对强势方向。行业层面 光伏设备 领涨、煤炭开采加工 领跌，结构分化明显。上市公司公告、交易所监管及权威媒体等风险事件来源尚未接入，本日风险事件覆盖不完整，无法判定「无风险事件」。以上为基于当日真实行情数据与确定性规则的自动观察，仅供复盘参考，不构成任何买卖建议。",
+  "source_coverage": {
+    "core_metrics": {
+      "status": "available",
+      "detail": "两市成交额、涨跌停、10亿以上家数、集中度、两融来自现有每日快照。"
+    },
+    "industry_board": {
+      "status": "available",
+      "detail": "行业板块涨跌 Top10（源：ths），仅含涨幅与成交额。"
+    },
+    "concept_board": {
+      "status": "unavailable",
+      "detail": "概念板块数据尚未接入。"
+    },
+    "board_constituents": {
+      "status": "unavailable",
+      "detail": "板块成分股映射尚未接入，上涨家数占比、涨停密度无法计算。"
+    },
+    "advance_decline": {
+      "status": "unavailable",
+      "detail": "全市场上涨/下跌家数需全市场快照，当前快照未落盘该字段。"
+    },
+    "risk_events": {
+      "status": "unavailable",
+      "detail": "上市公司公告（巨潮）、交易所监管、权威媒体等来源尚未接入。"
+    }
+  },
+  "data_warnings": [
+    "共振评分为「可用指标简版」（≤3/5 项有效），未达完整共振门槛，仅供参考。",
+    "个股红榜取当日「成交额≥5亿且涨幅≥5%」的高活跃上涨股；黑榜取「跌停且成交额≥10亿」个股。全市场涨跌个股榜需全市场快照，当前未接入。"
+  ],
+  "ai_generated": false,
+  "generation_mode": "规则自动生成（未接入 AI Provider）"
+}

@@ -12,6 +12,7 @@ export interface NavEntry {
 // 全部 10 个模块入口，均已交付
 const nav: NavEntry[] = [
   { path: '/', icon: '🏠', label: '今日速览', enabled: true },
+  { path: '/daily-observation', icon: '📊', label: '每日市场观察', enabled: true },
   { path: '/money', icon: '💰', label: '资金面', enabled: true },
   { path: '/index', icon: '📊', label: '指数观察', enabled: true },
   { path: '/industry', icon: '🏭', label: '行业', enabled: true },
