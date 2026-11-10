@@ -1,0 +1,402 @@
+{
+  "trade_date": "20261030",
+  "generated_at": "2026-11-09T01:43:18+08:00",
+  "market_metrics": {
+    "total_amount": {
+      "value": 16744.68,
+      "change": 1179.44,
+      "change_pct": 7.58,
+      "unit": "亿元"
+    },
+    "limit_up": {
+      "value": 47,
+      "change": 8,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "limit_down": {
+      "value": 82,
+      "change": 41,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "over_10e_count": {
+      "value": 339,
+      "change": 24,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "top10_pct": {
+      "value": 6.82,
+      "change": 0.12,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "top20_pct": {
+      "value": 10.02,
+      "change": -0.14,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "top50_pct": {
+      "value": 16.72,
+      "change": -0.66,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "margin_balance": {
+      "value": 23356.5,
+      "change": null,
+      "change_pct": null,
+      "unit": "亿元",
+      "stat_date": "20261030"
+    },
+    "stock_count": {
+      "value": 5223,
+      "change": null,
+      "change_pct": null,
+      "unit": "家"
+    }
+  },
+  "market_summary": "两市成交额 16745 亿元，较上一交易日放量 1179 亿元（+7.6%），资金参与度提升。涨停 47 家、跌停 82 家（涨停较上一交易日增加 8 家）。跌停家数偏多，亏钱效应显现。成交额超 10 亿元个股 339 家（增加 24 家）。前 10 大个股成交占比 6.8%（较上一交易日上升 0.12 个百分点）。",
+  "sector_resonance": {
+    "board": {
+      "name": "白酒",
+      "category": "行业",
+      "change": 5.28,
+      "relative_strength": null,
+      "up_ratio": null,
+      "amount": 244.7,
+      "amount_change": 110.2,
+      "limit_up_count": null,
+      "limit_up_density": null,
+      "valid_count": 2,
+      "indicators": {
+        "board_change": {
+          "label": "板块涨幅",
+          "weight": 0.2,
+          "value": 5.28,
+          "valid": true,
+          "pctile": 100.0
+        },
+        "relative_strength": {
+          "label": "相对大盘强度",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        },
+        "up_ratio": {
+          "label": "上涨家数占比",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        },
+        "amount_change": {
+          "label": "成交额变化",
+          "weight": 0.2,
+          "value": 110.2,
+          "valid": true,
+          "pctile": 100.0
+        },
+        "limit_up_density": {
+          "label": "涨停密度",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        }
+      },
+      "raw_score": 100.0,
+      "representative_stocks": [],
+      "representative_note": "板块成分股映射未接入，暂无法提供该板块内的代表性个股；"
+    },
+    "benchmark": null,
+    "benchmark_name": "中证全指(沪深合计代理)",
+    "note": "v1 行业共振为「可用指标简版」：上涨家数占比、涨停密度需板块成分股数据，当前未接入，故最多 3/5 项有效，未达「≥4 项入主榜」的完整共振门槛，评分仅供参考，不得视为完整共振结论。概念板块未采集。",
+    "qualified_full": false
+  },
+  "sector_rankings": {
+    "industry": {
+      "red": [
+        {
+          "name": "白酒",
+          "change": 5.28,
+          "amount": 244.7,
+          "ratio": 1.46,
+          "amount_change": 110.2
+        },
+        {
+          "name": "医疗服务",
+          "change": 1.56,
+          "amount": 350.2,
+          "ratio": 2.09,
+          "amount_change": null
+        },
+        {
+          "name": "港口航运",
+          "change": 1.44,
+          "amount": 134.1,
+          "ratio": 0.8,
+          "amount_change": null
+        },
+        {
+          "name": "银行",
+          "change": 0.77,
+          "amount": 412.2,
+          "ratio": 2.46,
+          "amount_change": 17.4
+        },
+        {
+          "name": "机场航运",
+          "change": 0.76,
+          "amount": 28.6,
+          "ratio": 0.17,
+          "amount_change": null
+        },
+        {
+          "name": "饮料制造",
+          "change": 0.21,
+          "amount": 119.4,
+          "ratio": 0.71,
+          "amount_change": null
+        },
+        {
+          "name": "医药商业",
+          "change": 0.21,
+          "amount": 62.0,
+          "ratio": 0.37,
+          "amount_change": null
+        }
+      ],
+      "black": [
+        {
+          "name": "影视院线",
+          "change": -7.34,
+          "amount": 93.7,
+          "ratio": 0.56,
+          "amount_change": -11.7
+        },
+        {
+          "name": "游戏",
+          "change": -6.37,
+          "amount": 104.6,
+          "ratio": 0.62,
+          "amount_change": null
+        },
+        {
+          "name": "文化传媒",
+          "change": -6.2,
+          "amount": 345.0,
+          "ratio": 2.06,
+          "amount_change": null
+        },
+        {
+          "name": "软件开发",
+          "change": -6.18,
+          "amount": 397.6,
+          "ratio": 2.38,
+          "amount_change": 49.7
+        },
+        {
+          "name": "通信设备",
+          "change": -5.87,
+          "amount": 1076.2,
+          "ratio": 6.43,
+          "amount_change": 11.4
+        },
+        {
+          "name": "半导体",
+          "change": -5.44,
+          "amount": 1883.9,
+          "ratio": 11.25,
+          "amount_change": -38.4
+        },
+        {
+          "name": "IT服务",
+          "change": -5.43,
+          "amount": 335.4,
+          "ratio": 2.0,
+          "amount_change": null
+        },
+        {
+          "name": "军工电子",
+          "change": -5.06,
+          "amount": 186.4,
+          "ratio": 1.11,
+          "amount_change": null
+        },
+        {
+          "name": "计算机设备",
+          "change": -4.8,
+          "amount": 232.8,
+          "ratio": 1.39,
+          "amount_change": null
+        },
+        {
+          "name": "消费电子",
+          "change": -4.68,
+          "amount": 402.8,
+          "ratio": 2.41,
+          "amount_change": 2.9
+        }
+      ],
+      "source": "ths",
+      "note": "口径：同花顺行业板块当日数据",
+      "as_of": null
+    },
+    "concept": {
+      "red": null,
+      "black": null,
+      "note": "概念板块数据尚未接入，暂不生成概念红黑榜。"
+    }
+  },
+  "stock_rankings": {
+    "red": [
+      {
+        "code": "301132",
+        "name": "满坤科技",
+        "change_pct": 20.01,
+        "amount": 8.35,
+        "is_limit_up": true
+      },
+      {
+        "code": "301520",
+        "name": "万邦医药",
+        "change_pct": 20.0,
+        "amount": 8.23,
+        "is_limit_up": true
+      },
+      {
+        "code": "688073",
+        "name": "毕得医药",
+        "change_pct": 19.01,
+        "amount": 6.18,
+        "is_limit_up": false
+      },
+      {
+        "code": "688137",
+        "name": "近岸蛋白",
+        "change_pct": 16.45,
+        "amount": 15.45,
+        "is_limit_up": false
+      },
+      {
+        "code": "301015",
+        "name": "百洋医药",
+        "change_pct": 14.84,
+        "amount": 9.41,
+        "is_limit_up": false
+      },
+      {
+        "code": "300829",
+        "name": "金丹科技",
+        "change_pct": 13.84,
+        "amount": 8.55,
+        "is_limit_up": false
+      }
+    ],
+    "black": [
+      {
+        "code": "002354",
+        "name": "天娱数科",
+        "change": -10.047846794128418,
+        "amount": 29.84,
+        "board": "主板"
+      },
+      {
+        "code": "002555",
+        "name": "三七互娱",
+        "change": -10.01243782043457,
+        "amount": 10.39,
+        "board": "主板"
+      },
+      {
+        "code": "002249",
+        "name": "大洋电机",
+        "change": -10.01220989227295,
+        "amount": 19.48,
+        "board": "主板"
+      },
+      {
+        "code": "603533",
+        "name": "掌阅科技",
+        "change": -10.003705024719238,
+        "amount": 13.12,
+        "board": "主板"
+      },
+      {
+        "code": "603236",
+        "name": "移远通信",
+        "change": -10.0,
+        "amount": 18.84,
+        "board": "主板"
+      },
+      {
+        "code": "002536",
+        "name": "飞龙股份",
+        "change": -10.0,
+        "amount": 13.9,
+        "board": "主板"
+      }
+    ],
+    "note": "个股红榜取当日「成交额≥5亿且涨幅≥5%」的高活跃上涨股；黑榜取「跌停且成交额≥10亿」个股。全市场涨跌个股榜需全市场快照，当前未接入。"
+  },
+  "risk_events": {
+    "events": [],
+    "coverage_status": "unavailable",
+    "message": "上市公司公告、交易所监管及权威媒体等风险事件来源尚未接入，本日风险事件覆盖不完整，无法判定「无风险事件」。",
+    "sources": [
+      {
+        "name": "巨潮资讯网",
+        "url": "https://www.cninfo.com.cn/",
+        "status": "未接入"
+      },
+      {
+        "name": "上交所披露",
+        "url": "https://www.sse.com.cn/disclosure/listedinfo/announcement/",
+        "status": "未接入"
+      },
+      {
+        "name": "深交所披露",
+        "url": "https://www.szse.cn/disclosure/",
+        "status": "未接入"
+      }
+    ]
+  },
+  "summary": "资金面回暖，量能放大。共振方向落在 行业「白酒」（涨幅 +5.28%），为当日相对强势方向。行业层面 白酒 领涨、影视院线 领跌，结构分化明显。上市公司公告、交易所监管及权威媒体等风险事件来源尚未接入，本日风险事件覆盖不完整，无法判定「无风险事件」。以上为基于当日真实行情数据与确定性规则的自动观察，仅供复盘参考，不构成任何买卖建议。",
+  "source_coverage": {
+    "core_metrics": {
+      "status": "available",
+      "detail": "两市成交额、涨跌停、10亿以上家数、集中度、两融来自现有每日快照。"
+    },
+    "industry_board": {
+      "status": "available",
+      "detail": "行业板块涨跌 Top10（源：ths），仅含涨幅与成交额。"
+    },
+    "concept_board": {
+      "status": "unavailable",
+      "detail": "概念板块数据尚未接入。"
+    },
+    "board_constituents": {
+      "status": "unavailable",
+      "detail": "板块成分股映射尚未接入，上涨家数占比、涨停密度无法计算。"
+    },
+    "advance_decline": {
+      "status": "unavailable",
+      "detail": "全市场上涨/下跌家数需全市场快照，当前快照未落盘该字段。"
+    },
+    "risk_events": {
+      "status": "unavailable",
+      "detail": "上市公司公告（巨潮）、交易所监管、权威媒体等来源尚未接入。"
+    }
+  },
+  "data_warnings": [
+    "共振评分为「可用指标简版」（≤3/5 项有效），未达完整共振门槛，仅供参考。",
+    "个股红榜取当日「成交额≥5亿且涨幅≥5%」的高活跃上涨股；黑榜取「跌停且成交额≥10亿」个股。全市场涨跌个股榜需全市场快照，当前未接入。",
+    "全A基准涨跌缺失，相对大盘强度不可计算。"
+  ],
+  "ai_generated": false,
+  "generation_mode": "规则自动生成（未接入 AI Provider）"
+}

@@ -1,19 +1,22 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useDataStore } from '../stores/data'
-import { PERIODS, aggregate, pctileText, type Period } from '../lib/agg'
+import { RANGES, inRange, type Range } from '../lib/period'
 import type { SeriesPoint } from '../types'
 import ChartPanel from '../components/ChartPanel.vue'
-import { miniLineOption } from '../lib/echarts'
+import { miniLineOption, MUTED, TEXT, BORDER } from '../lib/echarts'
+import type { EChartsOption } from 'echarts'
 
 const store = useDataStore()
-const period = ref<Period>('day')
+const router = useRouter()
+const range = ref<Range>('week')
 const taSeries = ref<SeriesPoint[]>([])
 const mgSeries = ref<SeriesPoint[]>([])
 const ready = ref(false)
 
 watch(
-  () => [store.currentDate, period.value],
+  () => store.currentDate,
   async () => {
     if (!store.currentDate) return
     ready.value = false
@@ -29,34 +32,69 @@ watch(
 )
 
 const date = computed(() => store.currentDate)
+const rangeLabel = computed(() => RANGES.find((r) => r.key === range.value)?.label ?? '本周')
 
-const taAgg = computed(() => aggregate(taSeries.value, date.value, period.value))
-const mgAgg = computed(() => aggregate(mgSeries.value, date.value, period.value))
+// 两市成交额：按所选自然周期筛选真实交易日，不补 0
+const taFiltered = computed(() =>
+  taSeries.value.filter((p) => p.value != null && inRange(p.date, date.value, range.value))
+)
 
 function fmt(n: number | null | undefined, digits = 0): string {
   if (n == null) return '—'
   return n.toLocaleString('zh-CN', { maximumFractionDigits: digits, minimumFractionDigits: digits })
 }
 
-function lineOpt(points: SeriesPoint[]) {
-  const last = points.slice(-20)
-  return miniLineOption(
-    last.map((p) => ({ label: p.date.slice(4, 6) + '/' + p.date.slice(6, 8), value: p.value }))
-  )
-}
-
-function subText(agg: { rank: number | null; rankYear: number | null; sampleN: number }, n: number): string {
-  const parts: string[] = []
-  if (period.value === 'day') {
-    if (agg.rankYear != null) parts.push(`年内第 ${agg.rankYear} 名`)
-    parts.push(pctileText(agg.rank, n))
-  } else if (agg.rank != null) {
-    parts.push(`历史第 ${agg.rank} 名（同口径均值）`)
-    parts.push(pctileText(agg.rank, agg.sampleN))
-  } else {
-    parts.push('均值口径无排名')
+const taLineOpt = computed<EChartsOption>(() => {
+  const pts = taFiltered.value
+  const labels = pts.map((p) => p.date.slice(4, 6) + '/' + p.date.slice(6, 8))
+  return {
+    animation: false,
+    grid: { left: 8, right: 8, top: 12, bottom: 4, containLabel: true },
+    tooltip: {
+      trigger: 'axis', confine: true,
+      backgroundColor: '#131820', borderColor: BORDER, textStyle: { color: TEXT, fontSize: 12 },
+      formatter: (params: unknown) => {
+        const arr = params as { dataIndex: number }[]
+        const p = pts[arr[0]?.dataIndex ?? 0]
+        return p ? `${p.date.slice(0, 4)}-${p.date.slice(4, 6)}-${p.date.slice(6, 8)}<br/>两市成交额：${p.value.toLocaleString('zh-CN')} 亿` : ''
+      }
+    },
+    xAxis: {
+      type: 'category', data: labels,
+      axisLine: { lineStyle: { color: BORDER } }, axisTick: { show: false },
+      axisLabel: { color: MUTED, fontSize: 10, interval: Math.max(Math.floor(labels.length / 8), 0) }
+    },
+    yAxis: {
+      type: 'value', scale: true,
+      splitLine: { lineStyle: { color: BORDER, type: 'dashed' } },
+      axisLabel: { color: MUTED, fontSize: 10 }
+    },
+    series: [{
+      type: 'line', smooth: true, symbol: 'none',
+      data: pts.map((p) => p.value),
+      lineStyle: { color: '#B7410E', width: 2 }, itemStyle: { color: '#B7410E' },
+      areaStyle: { color: '#B7410E22' }
+    }]
   }
-  return parts.join(' · ')
+})
+
+// 两融余额卡片：最近一条有效余额 + 统计日期
+const mgLatest = computed(() => {
+  const pts = mgSeries.value.filter((p) => p.value != null)
+  return pts.length ? pts[pts.length - 1] : null
+})
+const mgSpark = computed<EChartsOption>(() =>
+  miniLineOption(
+    mgSeries.value.slice(-120).filter((p) => p.value != null).map((p) => ({
+      label: p.date.slice(4, 6) + '/' + p.date.slice(6, 8),
+      value: p.value
+    })),
+    '#58A6FF'
+  )
+)
+
+function openMargin() {
+  router.push('/margin')
 }
 </script>
 
@@ -65,44 +103,46 @@ function subText(agg: { rank: number | null; rankYear: number | null; sampleN: n
     <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
       <div>
         <h1 class="page-title">💰 资金面 · <span class="num">{{ store.formatDay(date) }}</span></h1>
-        <p class="page-desc">两市成交 / 两融余额 · 排名与百分位（{{ taAgg.note }}）</p>
-      </div>
-      <div style="display:flex; gap:6px;">
-        <button
-          v-for="p in PERIODS" :key="p.key"
-          class="btn" :class="period === p.key ? '' : 'secondary'"
-          @click="period = p.key"
-        >{{ p.label }}</button>
+        <p class="page-desc">两市成交 / 两融余额 · 点击两融卡片查看日、周、月完整走势</p>
       </div>
     </div>
 
     <div v-if="ready" class="card-grid cols-2">
       <div class="card">
-        <div class="card-title">📊 两市成交额</div>
-        <div class="card-desc">
-          {{ period === 'day' ? '当日合计（亿元）' : period === 'month' ? '本月交易日均值' : period === 'year' ? '本年交易日均值' : '全历史均值' }}
+        <div class="card-title">📊 {{ rangeLabel }}两市成交额</div>
+        <div style="display:flex; gap:6px; margin-top:4px;">
+          <button
+            v-for="p in RANGES" :key="p.key"
+            class="btn" :class="range === p.key ? '' : 'secondary'"
+            @click="range = p.key"
+          >{{ p.label }}</button>
         </div>
-        <div class="card-value num">{{ fmt(taAgg.value) }}<span class="unit">亿</span></div>
-        <div class="card-sub num">{{ subText(taAgg, taAgg.sampleN) }}</div>
-        <span v-if="taAgg.sampleN >= 30" class="card-sample num">样本N={{ taAgg.sampleN }}</span>
-        <span v-else class="card-insufficient">样本不足</span>
-        <div style="margin-top:8px"><ChartPanel :option="lineOpt(taSeries)" height="150px" /></div>
+        <div class="card-desc" style="margin-top:8px">
+          {{ rangeLabel }}内 {{ taFiltered.length }} 个有效交易日
+        </div>
+        <div class="card-value num">{{ fmt(taFiltered[taFiltered.length - 1]?.value ?? store.daily?.overview.total_amount) }}<span class="unit">亿</span></div>
+        <div class="card-sub num">最近交易日合计（亿元）</div>
+        <div style="margin-top:8px"><ChartPanel :option="taLineOpt" height="170px" /></div>
       </div>
 
-      <div class="card">
-        <div class="card-title">🏦 两融余额</div>
+      <div class="card clickable" @click="openMargin" title="查看两融日/周/月完整走势">
+        <div class="card-title">🏦 两融余额<span class="muted" style="font-size:12px; margin-left:6px">点击查看详情 →</span></div>
         <div class="card-desc">沪市+深市汇总（亿元）<template v-if="store.daily?.overview.margin_date"> · 统计日期 {{ store.formatDay(store.daily.overview.margin_date) }}</template></div>
-        <div class="card-value num">{{ fmt(mgAgg.value) }}<span class="unit">亿</span></div>
-        <div class="card-sub num">{{ subText(mgAgg, mgAgg.sampleN) }}</div>
-        <span v-if="mgAgg.sampleN >= 30" class="card-sample num">样本N={{ mgAgg.sampleN }}</span>
-        <span v-else-if="mgAgg.sampleN > 0" class="card-insufficient">样本不足</span>
-        <div style="margin-top:8px"><ChartPanel :option="lineOpt(mgSeries)" height="150px" color="#58A6FF" /></div>
+        <div class="card-value num">{{ fmt(mgLatest?.value) }}<span class="unit">亿</span></div>
+        <div class="card-sub num">历史样本 N={{ mgSeries.filter((p) => p.value != null).length }}（自 2010-03-31）</div>
+        <div style="margin-top:8px"><ChartPanel :option="mgSpark" height="170px" /></div>
       </div>
     </div>
     <div v-else class="loading-box">加载序列数据…</div>
-
-    <p class="muted" style="margin-top:14px; font-size:12px">
-      切换档位只改变聚合口径（均值合成），指标定义与样本窗口不变。
-    </p>
   </div>
 </template>
+
+<style scoped>
+.clickable {
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.clickable:hover {
+  border-color: #58A6FF;
+}
+</style>

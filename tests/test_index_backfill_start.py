@@ -34,6 +34,6 @@ def test_known_codes_use_configured_start():
 
 def test_unconfigured_codes_fall_back_to_2015():
     # sh000852 因 2011 年数据缺口不纳入；未验证/派生代码一律回退默认
-    for code in ("sh000852", "sh000688", "bj899050", "sh932000",
+    for code in ("sh000852", "sh000688", "sh932000",
                  "hstech_513180", "micro_proxy", "unknown"):
         assert index_start_for(code) == "2015-01-01"

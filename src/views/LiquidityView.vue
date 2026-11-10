@@ -11,6 +11,7 @@ import { fmtBeijingTime, pctDelta } from '../lib/format'
 const store = useDataStore()
 const o10Series = ref<SeriesPoint[]>([])
 const bucketSeries = ref<BucketSeriesFile['points']>([])
+const amountBucketSeries = ref<BucketSeriesFile['points']>([])
 const ready = ref(false)
 
 watch(
@@ -18,7 +19,7 @@ watch(
   async () => {
     if (!store.currentDate) return
     ready.value = false
-    const [o10, buckets] = await Promise.all([
+    const [o10, buckets, amountBuckets] = await Promise.all([
       store.getSeries('over_10e_count'),
       (async () => {
         try {
@@ -26,10 +27,18 @@ watch(
         } catch {
           return null
         }
+      })(),
+      (async () => {
+        try {
+          return await (await fetch('/data/series/amount_buckets.json')).json() as BucketSeriesFile
+        } catch {
+          return null
+        }
       })()
     ])
     o10Series.value = o10?.points ?? []
     bucketSeries.value = buckets?.points ?? []
+    amountBucketSeries.value = amountBuckets?.points ?? []
     ready.value = true
   },
   { immediate: true }
@@ -159,7 +168,7 @@ const mcapValuePieOpt = computed<EChartsOption | null>(() => {
 const BUCKET_COLORS = ['#1E3A5F', '#2C5282', '#B7410E', '#D97B29', '#F59E0B', '#FF4D4F']
 const stackOpt = computed<EChartsOption | null>(() => {
   if (!bucketSeries.value.length) return null
-  const pts = bucketSeries.value.slice(-60)
+  const pts = bucketSeries.value
   const labels = pts.map((p) => p.date.slice(4, 6) + '/' + p.date.slice(6, 8))
   const labelsFull = pts.map((p) => p.date)
   const labelSet = pts[0]?.buckets.map((b) => b.label) ?? []
@@ -196,12 +205,54 @@ const stackOpt = computed<EChartsOption | null>(() => {
     }))
   }
 })
+
+// 全市场成交额结构 7 档堆叠面积图（历史回补至 1997 年）
+const AMOUNT_COLORS = ['#8B0000', '#B7410E', '#D97B29', '#F1C40F', '#27AE60', '#3498DB', '#7F8C8D']
+const amountStackOpt = computed<EChartsOption | null>(() => {
+  if (!amountBucketSeries.value.length) return null
+  const pts = amountBucketSeries.value
+  const labels = pts.map((p) => p.date.slice(4, 6) + '/' + p.date.slice(6, 8))
+  const labelsFull = pts.map((p) => p.date)
+  const labelSet = pts[0]?.buckets.map((b) => b.label) ?? []
+  return {
+    animation: false,
+    grid: { left: 8, right: 8, top: 30, bottom: 4, containLabel: true },
+    legend: { top: 2, textStyle: { color: MUTED, fontSize: 10 }, data: labelSet, type: 'scroll' },
+    tooltip: {
+      trigger: 'axis', confine: true,
+      backgroundColor: '#131820', borderColor: BORDER, textStyle: { color: TEXT, fontSize: 12 },
+      formatter: (params: unknown) => {
+        const arr = params as { axisValue: string; dataIndex: number }[]
+        const idx = arr[0]?.dataIndex ?? 0
+        const buckets = pts[idx]?.buckets ?? []
+        const date = labelsFull[idx] ?? ''
+        const lines = [`<b>${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}</b>`]
+        for (const b of [...buckets].reverse()) {
+          lines.push(`${b.label}：${b.count} 家（${b.pct}%）`)
+        }
+        return lines.join('<br/>')
+      }
+    },
+    xAxis: {
+      type: 'category', data: labels,
+      axisLine: { lineStyle: { color: BORDER } }, axisTick: { show: false },
+      axisLabel: { color: MUTED, fontSize: 10, interval: Math.max(Math.floor(labels.length / 10), 0) }
+    },
+    yAxis: { type: 'value', max: 100, axisLabel: { color: MUTED, fontSize: 10, formatter: '{value}%' }, splitLine: { lineStyle: { color: BORDER, type: 'dashed' } } },
+    series: labelSet.map((label, i) => ({
+      name: label, type: 'line' as const, stack: 'total', areaStyle: { opacity: 0.85 },
+      lineStyle: { width: 0 }, symbol: 'none', emphasis: { focus: 'series' as const },
+      itemStyle: { color: AMOUNT_COLORS[i % AMOUNT_COLORS.length] },
+      data: pts.map((p) => p.buckets.find((b) => b.label === label)?.pct ?? 0)
+    }))
+  }
+})
 </script>
 
 <template>
   <div class="page">
     <h1 class="page-title">📐 流动性结构 · <span class="num">{{ daily ? store.formatDay(daily.trade_date) : '—' }}</span></h1>
-    <p class="page-desc">10亿以上活跃家数 + 成交额结构 + 活跃股市值结构 + 市值 6 档结构 · 各表格「股票数量」「占比」括号内为较上一交易日变化（数量为家数差、占比为差值%）</p>
+    <p class="page-desc">10亿以上活跃家数 + 成交额结构 + 活跃股市值结构 + 市值 6 档结构 · 各表格「股票数量」「占比」括号内为较上一有效交易日变化（数量为家数差、占比为差值%；若上一交易日刚被重建且无分档数据，则向前回溯到最近保留分档表的真实快照）</p>
     <SpotDataNotice />
 
     <template v-if="liq && daily">
@@ -238,6 +289,11 @@ const stackOpt = computed<EChartsOption | null>(() => {
               </tr>
             </tbody>
           </table>
+        </div>
+        <div style="margin-top:10px">
+          <div class="card-sub muted" style="margin-bottom:4px">历史结构（占比%，1997 年至今）</div>
+          <ChartPanel v-if="amountStackOpt" :option="amountStackOpt" height="260px" />
+          <div v-else class="empty-box">🟡 成交额结构历史序列尚未累积</div>
         </div>
       </div>
 

@@ -14,7 +14,10 @@ watch(() => route.fullPath, () => { sidebarOpen.value = false })
 
 <template>
   <GateShell>
-    <div class="app-layout">
+    <div v-if="route.meta.bare" class="bare-layout">
+      <router-view />
+    </div>
+    <div v-else class="app-layout">
       <Sidebar :open="sidebarOpen" @close="sidebarOpen = false" />
       <div class="overlay" :class="{ show: sidebarOpen }" @click="sidebarOpen = false"></div>
       <div class="main-area">
@@ -29,3 +32,10 @@ watch(() => route.fullPath, () => { sidebarOpen.value = false })
     </div>
   </GateShell>
 </template>
+
+<style scoped>
+.bare-layout {
+  background: #ffffff;
+  min-height: 100vh;
+}
+</style>

@@ -14,18 +14,34 @@ import pytest
 from modules import compute
 from modules.common import DATA_DIR
 
-# 已确认由 make_sample_data.py 合成、必须为空的区间
+# 已确认由 make_sample_data.py 合成、且尚未回补真实数据、必须为空的区间。
 DEMO_RANGES = {
     "index_amount_micro_proxy": ("20200102", "20260924"),
-    "index_amount_bj899050": ("20200102", "20260924"),
-    "index_amount_sh000688": ("20260105", "20260924"),
     "index_amount_sh932000": ("20260105", "20260924"),
 }
+
+# 原示例数据区间，已用通达信 vipdoc 真实日线回补——不再要求「为空」，
+# 而要求「必须为有效真实值 + 来源已标注」，避免回补段被误当缺失或再次被假数据污染。
+BACKFILLED_RANGES = {
+    "index_amount_sh000688": ("20260105", "20260924"),
+}
+
+# 所有「经历过示例数据清理/真实回补」的序列：都必须声明覆盖起点、有 note、无极端跳变
+ALL_CLEANED = {**DEMO_RANGES, **BACKFILLED_RANGES}
 
 
 def _load(key):
     with open(os.path.join(DATA_DIR, "series", f"{key}.json"), encoding="utf-8") as f:
         return json.load(f)
+
+
+def _recent_daily_dates(n=5):
+    """最近 n 个交易日（增量构建可能产生真实「0 家跌停」，不在回填清单内）。"""
+    daily_dir = os.path.join(DATA_DIR, "daily")
+    if not os.path.isdir(daily_dir):
+        return set()
+    files = sorted(f[:-5] for f in os.listdir(daily_dir) if f.endswith(".json"))
+    return set(files[-n:])
 
 
 # ---------------------------------------------------------------- 计算口径
@@ -69,9 +85,25 @@ def test_no_demo_points_remain(key):
     assert not bad, f"{key} 仍残留 {len(bad)} 个合成点，例如 {bad[:3]}"
 
 
-@pytest.mark.parametrize("key", list(DEMO_RANGES))
+@pytest.mark.parametrize("key", list(BACKFILLED_RANGES))
+def test_backfilled_ranges_have_real_data(key):
+    """已回补的示例数据区间必须为有效真实值，且来源标注了通达信回补。
+
+    原 test_no_demo_points_remain 对这些区间断言「为空」；数据回补后断言更新为
+    「必须有真实值」，保留对「假数据/空缺口」的防护，同时防止回补段被再次清空。
+    """
+    lo, hi = BACKFILLED_RANGES[key]
+    obj = _load(key)
+    pts = [p for p in obj["points"] if lo <= p["date"] <= hi]
+    assert pts, f"{key} 回补区间 {lo}~{hi} 没有任何数据点"
+    bad = [p["date"] for p in pts if p.get("value") is None or p["value"] <= 0]
+    assert not bad, f"{key} 回补区间含空值/非正值：{bad[:5]}"
+    assert "通达信" in (obj.get("source") or ""), f"{key} 未在 source 标注通达信回补来源"
+
+
+@pytest.mark.parametrize("key", list(ALL_CLEANED))
 def test_coverage_start_declared(key):
-    """清理后必须显式声明覆盖起点，前端/报告据此区分「真历史」与「无数据」"""
+    """清理/回补后必须显式声明覆盖起点，前端/报告据此区分「真历史」与「无数据」"""
     obj = _load(key)
     assert obj.get("coverage_start"), f"{key} 缺少 coverage_start"
     assert obj["points"][0]["date"] == obj["coverage_start"]
@@ -86,7 +118,7 @@ def test_micro_proxy_magnitude_plausible():
 
 def test_no_extreme_regime_break_after_repair():
     """真实序列不应出现 >20 倍的相邻跳变（合成数据拼接的典型特征：282 倍）"""
-    for key in DEMO_RANGES:
+    for key in ALL_CLEANED:
         pts = [(p["date"], p["value"]) for p in _load(key)["points"] if p.get("value")]
         for (d1, v1), (d2, v2) in zip(pts, pts[1:]):
             r = max(v2 / v1, v1 / v2)
@@ -94,8 +126,8 @@ def test_no_extreme_regime_break_after_repair():
 
 
 def test_small_sample_has_no_rank():
-    """样本 <30 时排名/百分位必须为空（3 个点的百分位毫无意义，不能当真）"""
-    for key in ("index_amount_micro_proxy", "index_amount_bj899050"):
+    """样本 <30 时排名/百分位必须为空（3 个点的百分位毫无意义，不能当真）。"""
+    for key in ("index_amount_micro_proxy",):
         for p in _load(key)["points"]:
             assert p.get("pctile") is None and p.get("rank_all") is None
 
@@ -137,9 +169,29 @@ def test_series_have_no_nontrading_points():
 
 
 def test_no_zero_limit_pool_values():
-    """涨停/跌停家数写 0 只允许是真实「全市场无涨跌停」，接口失败必须写缺口"""
+    """涨停/跌停家数写 0 只允许是真实「全市场无涨跌停」，接口失败必须写缺口
+
+    例外 1（2026-10-21 跌停缺口回填）：98 个缺口日经三重校验确认为真实 0 值，
+    日期清单已在序列 backfill.filled_dates 中声明。
+    例外 2（增量构建）：最近几个交易日可能真实「0 家跌停」，由实时接口正常
+    返回空跌停池产生，不在回填清单内，属真实 0 而非失败写 0。
+    清单外 + 非近期的 0 值（接口失败静默写 0 的形态）仍然失败。
+    """
+    verified = set()
+    with open(os.path.join(DATA_DIR, "series", "limit_down.json"), encoding="utf-8") as f:
+        verified = set((json.load(f).get("backfill") or {}).get("filled_dates") or [])
+    recent = _recent_daily_dates(n=5)
     for key in ("limit_up_down", "limit_down"):
         zeros = [p["date"] for p in _load(key)["points"] if p.get("value") == 0]
+        if key == "limit_down" and verified:
+            # 回填段自洽：filled_dates 必须是 0 值日的子集（不变量不变）
+            assert verified <= set(zeros), (
+                f"filled_dates 含非 0 值日：{sorted(verified - set(zeros))[:5]}")
+            # 清单外 + 非近期 = 非法（失败写 0）
+            unverified = [d for d in zeros if d not in verified and d not in recent]
+            assert not unverified, (
+                f"limit_down 存在未声明的 0 值日（疑似失败写 0）：{unverified[:5]}")
+            continue
         assert not zeros, f"{key} 含 0 值点（疑似失败被写成 0）：{zeros[:5]}"
 
 

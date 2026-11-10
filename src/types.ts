@@ -135,6 +135,8 @@ export interface Concentration {
   top10_change?: number | null
   top20_change?: number | null
   top50_change?: number | null
+  /** 变化值实际比较的交易日（YYYYMMDD）；回退到早于「前一交易日」时用于展示真实比较日期 */
+  concentration_change_date?: string | null
 }
 
 export interface Emotion {
@@ -253,9 +255,29 @@ export interface DailyData {
   }
 }
 
+/** 单个规则信号（多信号累积，不再互相覆盖） */
+export interface SignalTag {
+  /** 信号标签，如「成交高度集中」「小微盘活跃」「结构分化」 */
+  label: string
+  /** 信号方向：risk=风险/扣分，positive=积极/加分，neutral=中性（如分化标签，不改分） */
+  direction: 'risk' | 'positive' | 'neutral'
+  /** 加减分贡献（中性信号为 0） */
+  delta: number
+  /** 该信号的具体数据依据 */
+  basis: string
+}
+
 export interface ConclusionItem {
   text: string
   basis: string
+  /** 段落式结论（报告页用，比 text 更完整） */
+  paragraph?: string
+  /** 维度得分（0 ~ scoreMax） */
+  score?: number
+  /** 维度满分 */
+  scoreMax?: number
+  /** 触发的信号列表（多信号累积，含「结构分化」等中性标签） */
+  tags?: SignalTag[]
 }
 
 export interface Conclusion {
@@ -263,4 +285,202 @@ export interface Conclusion {
   structure: ConclusionItem
   emotion: ConclusionItem
   score: number
+  /** 综合结论段落 */
+  summary?: string
+  /** 评分明细（用于报告页展示维度得分拆解） */
+  scoreDetail?: string
+}
+
+// ===== 每日市场观察（/daily-observation）数据契约 =====
+// 对应 public/data/daily_observation/YYYYMMDD.json（由 scripts/build_observation.py 生成）
+
+export interface MetricValue {
+  value: number | null
+  /** 较上一有效交易日的绝对变化量 */
+  change: number | null
+  /** 变化百分比（%）；计数类指标为 null，用绝对变化量表达 */
+  change_pct: number | null
+  unit?: string
+  /** 两融余额的真实统计日期（T+1） */
+  stat_date?: string | null
+  /** 两融上一次有效统计日期（比较两条实际有效记录） */
+  prev_stat_date?: string | null
+  /** 两融上一次有效统计值 */
+  prev_value?: number | null
+  /** pp=百分点变化（集中度），abs=绝对变化 */
+  change_kind?: 'pp' | 'abs'
+}
+
+export interface ObservationMarketMetrics {
+  total_amount: MetricValue
+  limit_up: MetricValue
+  limit_down: MetricValue
+  over_10e_count: MetricValue
+  top10_pct: MetricValue
+  top20_pct: MetricValue
+  top50_pct: MetricValue
+  margin_balance: MetricValue
+  stock_count: MetricValue
+}
+
+export interface SectorRankRow {
+  name: string
+  change: number
+  amount: number
+  ratio: number | null
+  amount_change: number | null
+}
+
+export interface ResonanceIndicator {
+  label: string
+  weight: number
+  value: number | null
+  valid: boolean
+  pctile?: number | null
+}
+
+export interface ResonanceBoard {
+  name: string
+  category: string
+  change: number
+  relative_strength: number | null
+  up_ratio: number | null
+  amount: number
+  amount_change: number | null
+  limit_up_count: number | null
+  limit_up_density: number | null
+  /** 有效指标数量 / 5 */
+  valid_count: number
+  indicators: Record<string, ResonanceIndicator>
+  /** 0~100 共振参考分；仅 valid_count>=4 时有值，否则为 null（不显示评分） */
+  raw_score: number | null
+  representative_stocks: StockRankRow[]
+  representative_note?: string
+  /** 板块成分股总数（东财当日数据） */
+  constituent_count?: number | null
+  /** 领涨股 */
+  lead_name?: string | null
+  lead_code?: string | null
+  lead_limit_up?: boolean | null
+}
+
+export interface SectorResonance {
+  board: ResonanceBoard | null
+  benchmark: number | null
+  benchmark_name: string
+  note: string
+  /** 是否达到「≥4 项有效」的完整共振门槛（进入正式排名） */
+  qualified_full: boolean
+  /** 正式排名候选数 */
+  qualified_count?: number
+  /** 行业榜首 / 概念榜首（东财当日独立排名） */
+  industry_top?: ResonanceBoard | null
+  concept_top?: ResonanceBoard | null
+  /** 数据来源：ths_top10 | eastmoney_push2 */
+  source?: string
+}
+
+export interface StockRankRow {
+  code: string
+  name: string
+  change_pct?: number
+  change?: number
+  amount: number
+  is_limit_up?: boolean
+  board?: string
+}
+
+export interface RiskEventSource {
+  name: string
+  url: string
+  status: string
+  meta?: Record<string, unknown>
+}
+
+/** 一条公司公告 / 监管 / 媒体事件（客观事实，非投资评价） */
+export interface ObservationEvent {
+  event_id: string
+  event_date: string
+  published_at: string | null
+  collected_at?: string
+  company_name: string
+  stock_code: string
+  source_type: string          // announcement | regulation | media
+  source_name: string
+  event_category: string       // 经营进展 / 业绩信息 / 股东行为 / 资本运作 / 监管事项 / 法律事项 / 行业政策 / 宏观事件 / 其他信息
+  category_group: 'positive' | 'risk' | 'neutral'  // A 积极进展 / B 风险监管 / C 其他
+  title: string
+  factual_summary: string
+  event_status: string
+  original_url: string
+  related_primary_url?: string
+  verification_status: string  // official_confirmed | unverified
+  duplicate_key?: string
+  is_routine?: boolean
+}
+
+export interface SourceCoverageItem {
+  status: 'available' | 'missing' | 'unavailable'
+  detail: string
+}
+
+/** 六大指数当日行情 */
+export interface IndexQuote {
+  name: string
+  code: string
+  close: number | null
+  change_pct: number | null
+  change_points: number | null
+  prev_close: number | null
+}
+
+/** 板块涨跌 Top5 行 */
+export interface SectorTopRow {
+  name: string
+  category: string       // 行业 | 概念
+  change: number | null
+  amount: number | null
+  limit_up_count: number | null
+  limit_down_count: number | null
+}
+
+export interface MktcapBucket {
+  label: string
+  count: number
+  pct: number | null
+}
+
+export interface ObservationData {
+  trade_date: string
+  generated_at: string
+  report_trade_date?: string
+  coverage_window_start?: string
+  coverage_cutoff_at?: string
+  market_metrics: ObservationMarketMetrics
+  indexes: IndexQuote[]
+  market_summary: string
+  sector_top5: {
+    industry: { up: SectorTopRow[]; down: SectorTopRow[]; source?: string; note?: string }
+    concept: { up: SectorTopRow[] | null; down: SectorTopRow[] | null; source?: string | null; note: string }
+  }
+  mktcap_dist: {
+    buckets: MktcapBucket[]
+    sample_total: number | null
+    missing_mktcap: number | null
+    note: string
+  }
+  risk_events: {
+    events: ObservationEvent[]
+    groups: { buyback: ObservationEvent[]; risk: ObservationEvent[] }
+    coverage_status: string
+    message: string
+    sources: RiskEventSource[]
+    total_events?: number
+    displayed_events?: number
+  }
+  source_coverage: Record<string, SourceCoverageItem>
+  data_warnings: string[]
+  ai_generated: boolean
+  generation_mode: string
+  disclaimer?: string
 }

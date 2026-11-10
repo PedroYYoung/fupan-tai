@@ -7,7 +7,7 @@ import SpotDataNotice from '../components/SpotDataNotice.vue'
 import { miniLineOption } from '../lib/echarts'
 import type { EChartsOption } from 'echarts'
 import { MUTED, TEXT, BORDER } from '../lib/echarts'
-import { fmtBeijingTime, pctDelta } from '../lib/format'
+import { fmtBeijingTime, ppDelta } from '../lib/format'
 
 const store = useDataStore()
 const concSeries = ref<SeriesPoint[]>([])
@@ -51,6 +51,17 @@ const share50 = computed(() => conc.value?.top50_cum_pct ?? null)
 const chg10 = computed(() => conc.value?.top10_change ?? null)
 const chg20 = computed(() => conc.value?.top20_change ?? null)
 const chg50 = computed(() => conc.value?.top50_change ?? null)
+
+// 变化基准日期：仅当实际回退到早于「前一交易日」时才返回该日期，
+// 前端据此显示「较 MM/DD」，不冒充昨日变化。
+const chgDate = computed<string | null>(() => {
+  const d = conc.value?.concentration_change_date ?? null
+  if (!d) return null
+  const list = store.meta?.list ?? []
+  const i = list.indexOf(store.currentDate)
+  const prev = i > 0 ? list[i - 1] : null
+  return prev && d !== prev ? d : null
+})
 
 // 资金重要程度颜色分层
 function rankColor(rank: number): string {
@@ -171,19 +182,19 @@ const concOpt = computed(() =>
       <div class="card-grid cols-3" style="margin-top:14px">
         <div class="card">
           <div class="card-title">🔴 核心资金区 Top10</div>
-          <div class="card-value num">{{ fmt(share10) }}<span class="unit">%</span><span class="muted" style="font-size:14px">{{ pctDelta(chg10, 2) }}</span></div>
+          <div class="card-value num">{{ fmt(share10) }}<span class="unit">%</span><span class="muted" style="font-size:14px">{{ ppDelta(chg10, 2, chgDate) }}</span></div>
           <div class="card-sub num">市场最核心成交资金</div>
           <span class="card-sample num">占全市场成交</span>
         </div>
         <div class="card">
           <div class="card-title">🟠 次核心资金区 Top20</div>
-          <div class="card-value num">{{ fmt(share20) }}<span class="unit">%</span><span class="muted" style="font-size:14px">{{ pctDelta(chg20, 2) }}</span></div>
+          <div class="card-value num">{{ fmt(share20) }}<span class="unit">%</span><span class="muted" style="font-size:14px">{{ ppDelta(chg20, 2, chgDate) }}</span></div>
           <div class="card-sub num">含前10累计</div>
           <span class="card-sample num">累计口径</span>
         </div>
         <div class="card">
           <div class="card-title">🔵 普通活跃区 Top50</div>
-          <div class="card-value num">{{ fmt(share50) }}<span class="unit">%</span><span class="muted" style="font-size:14px">{{ pctDelta(chg50, 2) }}</span></div>
+          <div class="card-value num">{{ fmt(share50) }}<span class="unit">%</span><span class="muted" style="font-size:14px">{{ ppDelta(chg50, 2, chgDate) }}</span></div>
           <div class="card-sub num">含前20累计</div>
           <span class="card-sample num">累计口径</span>
         </div>

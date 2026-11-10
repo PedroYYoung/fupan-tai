@@ -60,20 +60,18 @@ const canDraw = computed(() => {
 
       <div class="card-grid cols-4">
         <MetricCard
-          icon="💰" title="两市成交额" desc="沪深两市合计"
+          icon="💰" title="两市成交额" desc="沪深两市合计（市场级汇总，非股票样本统计）"
           :value="fmt(daily.overview.total_amount)" unit="亿"
           :sub="daily.overview.total_amount_rank_year
             ? `年内第 ${daily.overview.total_amount_rank_year} 名 · 历史 ${daily.overview.total_amount_pctile_all ?? '—'}%`
             : '排名待回补'"
-          :sample-n="N_ALL"
         />
         <MetricCard
-          icon="🏦" title="两融余额" desc="沪市+深市汇总"
+          icon="🏦" title="两融余额" desc="沪市+深市汇总（市场级总量，非股票样本统计）"
           :value="daily.overview.margin_balance != null ? fmt(daily.overview.margin_balance) : '—'" unit="亿"
           :sub="daily.overview.margin_rank_year
             ? `年内第 ${daily.overview.margin_rank_year} 名 · 历史 ${daily.overview.margin_pctile_all ?? '—'}%`
             : '两融数据延迟约1日'"
-          :sample-n="daily.overview.margin_balance != null ? N_YEAR : null"
         />
         <MetricCard
           icon="🔥" title="涨停 · 跌停" desc="剔除ST/北交所/次新"

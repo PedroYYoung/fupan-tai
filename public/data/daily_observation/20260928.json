@@ -1,0 +1,337 @@
+{
+  "trade_date": "20260928",
+  "generated_at": "2026-11-09T01:43:18+08:00",
+  "market_metrics": {
+    "total_amount": {
+      "value": 17027.99,
+      "change": null,
+      "change_pct": null,
+      "unit": "亿元"
+    },
+    "limit_up": {
+      "value": 32,
+      "change": null,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "limit_down": {
+      "value": 62,
+      "change": null,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "over_10e_count": {
+      "value": 347,
+      "change": null,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "top10_pct": {
+      "value": null,
+      "change": null,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "top20_pct": {
+      "value": 10.67,
+      "change": null,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "top50_pct": {
+      "value": 18.21,
+      "change": null,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "margin_balance": {
+      "value": 26289.43,
+      "change": null,
+      "change_pct": null,
+      "unit": "亿元",
+      "stat_date": null
+    },
+    "stock_count": {
+      "value": 5210,
+      "change": null,
+      "change_pct": null,
+      "unit": "家"
+    }
+  },
+  "market_summary": "两市成交额数据缺失，无法判断量能变化。涨停 32 家、跌停 62 家。跌停家数偏多，亏钱效应显现。成交额超 10 亿元个股 347 家。",
+  "sector_resonance": {
+    "board": {
+      "name": "汽车整车",
+      "category": "行业",
+      "change": 1.72,
+      "relative_strength": null,
+      "up_ratio": null,
+      "amount": 133.9,
+      "amount_change": null,
+      "limit_up_count": null,
+      "limit_up_density": null,
+      "valid_count": 1,
+      "indicators": {
+        "board_change": {
+          "label": "板块涨幅",
+          "weight": 0.2,
+          "value": 1.72,
+          "valid": true,
+          "pctile": 100.0
+        },
+        "relative_strength": {
+          "label": "相对大盘强度",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        },
+        "up_ratio": {
+          "label": "上涨家数占比",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        },
+        "amount_change": {
+          "label": "成交额变化",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        },
+        "limit_up_density": {
+          "label": "涨停密度",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        }
+      },
+      "raw_score": 100.0,
+      "representative_stocks": [],
+      "representative_note": "板块成分股映射未接入，暂无法提供该板块内的代表性个股；"
+    },
+    "benchmark": null,
+    "benchmark_name": "中证全指(沪深合计代理)",
+    "note": "v1 行业共振为「可用指标简版」：上涨家数占比、涨停密度需板块成分股数据，当前未接入，故最多 3/5 项有效，未达「≥4 项入主榜」的完整共振门槛，评分仅供参考，不得视为完整共振结论。概念板块未采集。",
+    "qualified_full": false
+  },
+  "sector_rankings": {
+    "industry": {
+      "red": [
+        {
+          "name": "汽车整车",
+          "change": 1.72,
+          "amount": 133.9,
+          "ratio": 0.79,
+          "amount_change": null
+        },
+        {
+          "name": "小家电",
+          "change": 1.2,
+          "amount": 45.25,
+          "ratio": 0.27,
+          "amount_change": null
+        },
+        {
+          "name": "风电设备",
+          "change": 0.84,
+          "amount": 155.06,
+          "ratio": 0.91,
+          "amount_change": null
+        },
+        {
+          "name": "养殖业",
+          "change": 0.2,
+          "amount": 64.64,
+          "ratio": 0.38,
+          "amount_change": null
+        }
+      ],
+      "black": [
+        {
+          "name": "元件",
+          "change": -6.84,
+          "amount": 988.04,
+          "ratio": 5.8,
+          "amount_change": null
+        },
+        {
+          "name": "通信设备",
+          "change": -6.13,
+          "amount": 1336.57,
+          "ratio": 7.85,
+          "amount_change": null
+        },
+        {
+          "name": "电子化学品",
+          "change": -5.88,
+          "amount": 366.07,
+          "ratio": 2.15,
+          "amount_change": null
+        },
+        {
+          "name": "非金属材料",
+          "change": -5.63,
+          "amount": 67.7,
+          "ratio": 0.4,
+          "amount_change": null
+        },
+        {
+          "name": "贵金属",
+          "change": -5.62,
+          "amount": 192.18,
+          "ratio": 1.13,
+          "amount_change": null
+        },
+        {
+          "name": "其他电子",
+          "change": -5.26,
+          "amount": 162.49,
+          "ratio": 0.95,
+          "amount_change": null
+        },
+        {
+          "name": "半导体",
+          "change": -4.69,
+          "amount": 2262.25,
+          "ratio": 13.29,
+          "amount_change": null
+        },
+        {
+          "name": "其他电源设备",
+          "change": -4.58,
+          "amount": 136.43,
+          "ratio": 0.8,
+          "amount_change": null
+        },
+        {
+          "name": "消费电子",
+          "change": -4.28,
+          "amount": 408.43,
+          "ratio": 2.4,
+          "amount_change": null
+        },
+        {
+          "name": "军工电子",
+          "change": -4.24,
+          "amount": 192.12,
+          "ratio": 1.13,
+          "amount_change": null
+        }
+      ],
+      "source": null,
+      "note": "口径：同花顺行业板块当日数据",
+      "as_of": null
+    },
+    "concept": {
+      "red": null,
+      "black": null,
+      "note": "概念板块数据尚未接入，暂不生成概念红黑榜。"
+    }
+  },
+  "stock_rankings": {
+    "red": [],
+    "black": [
+      {
+        "code": "002625",
+        "name": "光启技术",
+        "change": -10.012,
+        "amount": 10.91,
+        "board": "主板"
+      },
+      {
+        "code": "600547",
+        "name": "山东黄金",
+        "change": -10.0103,
+        "amount": 37.16,
+        "board": "主板"
+      },
+      {
+        "code": "600353",
+        "name": "旭光电子",
+        "change": -10.0092,
+        "amount": 14.46,
+        "board": "主板"
+      },
+      {
+        "code": "002484",
+        "name": "江海股份",
+        "change": -10.0069,
+        "amount": 20.91,
+        "board": "主板"
+      },
+      {
+        "code": "605589",
+        "name": "圣泉集团",
+        "change": -10.005,
+        "amount": 11.92,
+        "board": "主板"
+      },
+      {
+        "code": "600498",
+        "name": "烽火通信",
+        "change": -10.0049,
+        "amount": 27.08,
+        "board": "主板"
+      }
+    ],
+    "note": "个股红榜取当日「成交额≥5亿且涨幅≥5%」的高活跃上涨股；黑榜取「跌停且成交额≥10亿」个股。全市场涨跌个股榜需全市场快照，当前未接入。"
+  },
+  "risk_events": {
+    "events": [],
+    "coverage_status": "unavailable",
+    "message": "上市公司公告、交易所监管及权威媒体等风险事件来源尚未接入，本日风险事件覆盖不完整，无法判定「无风险事件」。",
+    "sources": [
+      {
+        "name": "巨潮资讯网",
+        "url": "https://www.cninfo.com.cn/",
+        "status": "未接入"
+      },
+      {
+        "name": "上交所披露",
+        "url": "https://www.sse.com.cn/disclosure/listedinfo/announcement/",
+        "status": "未接入"
+      },
+      {
+        "name": "深交所披露",
+        "url": "https://www.szse.cn/disclosure/",
+        "status": "未接入"
+      }
+    ]
+  },
+  "summary": "共振方向落在 行业「汽车整车」（涨幅 +1.72%），为当日相对强势方向。行业层面 汽车整车 领涨、元件 领跌，结构分化明显。上市公司公告、交易所监管及权威媒体等风险事件来源尚未接入，本日风险事件覆盖不完整，无法判定「无风险事件」。以上为基于当日真实行情数据与确定性规则的自动观察，仅供复盘参考，不构成任何买卖建议。",
+  "source_coverage": {
+    "core_metrics": {
+      "status": "available",
+      "detail": "两市成交额、涨跌停、10亿以上家数、集中度、两融来自现有每日快照。"
+    },
+    "industry_board": {
+      "status": "available",
+      "detail": "行业板块涨跌 Top10（源：—），仅含涨幅与成交额。"
+    },
+    "concept_board": {
+      "status": "unavailable",
+      "detail": "概念板块数据尚未接入。"
+    },
+    "board_constituents": {
+      "status": "unavailable",
+      "detail": "板块成分股映射尚未接入，上涨家数占比、涨停密度无法计算。"
+    },
+    "advance_decline": {
+      "status": "unavailable",
+      "detail": "全市场上涨/下跌家数需全市场快照，当前快照未落盘该字段。"
+    },
+    "risk_events": {
+      "status": "unavailable",
+      "detail": "上市公司公告（巨潮）、交易所监管、权威媒体等来源尚未接入。"
+    }
+  },
+  "data_warnings": [
+    "共振评分为「可用指标简版」（≤3/5 项有效），未达完整共振门槛，仅供参考。",
+    "个股红榜取当日「成交额≥5亿且涨幅≥5%」的高活跃上涨股；黑榜取「跌停且成交额≥10亿」个股。全市场涨跌个股榜需全市场快照，当前未接入。",
+    "全A基准涨跌缺失，相对大盘强度不可计算。"
+  ],
+  "ai_generated": false,
+  "generation_mode": "规则自动生成（未接入 AI Provider）"
+}

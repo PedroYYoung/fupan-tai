@@ -1,0 +1,367 @@
+{
+  "trade_date": "20261104",
+  "generated_at": "2026-11-09T01:43:18+08:00",
+  "market_metrics": {
+    "total_amount": {
+      "value": 20376.94,
+      "change": 3342.57,
+      "change_pct": 19.62,
+      "unit": "亿元"
+    },
+    "limit_up": {
+      "value": 118,
+      "change": 70,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "limit_down": {
+      "value": 10,
+      "change": -7,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "over_10e_count": {
+      "value": 441,
+      "change": 80,
+      "change_pct": null,
+      "unit": "家"
+    },
+    "top10_pct": {
+      "value": 7.61,
+      "change": -0.53,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "top20_pct": {
+      "value": 11.36,
+      "change": -0.59,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "top50_pct": {
+      "value": 18.76,
+      "change": -0.34,
+      "change_pct": null,
+      "unit": "%",
+      "change_kind": "pp"
+    },
+    "margin_balance": {
+      "value": 23232.96,
+      "change": null,
+      "change_pct": null,
+      "unit": "亿元",
+      "stat_date": "20261102"
+    },
+    "stock_count": {
+      "value": 5572,
+      "change": null,
+      "change_pct": null,
+      "unit": "家"
+    }
+  },
+  "market_summary": "两市成交额 20377 亿元，较上一交易日放量 3343 亿元（+19.6%），资金参与度提升。涨停 118 家、跌停 10 家（涨停较上一交易日增加 70 家）。涨停家数明显多于跌停，赚钱效应占优。成交额超 10 亿元个股 441 家（增加 80 家）。前 10 大个股成交占比 7.6%（较上一交易日下降 0.53 个百分点）。",
+  "sector_resonance": {
+    "board": {
+      "name": "半导体",
+      "category": "行业",
+      "change": 10.55,
+      "relative_strength": 7.31,
+      "up_ratio": null,
+      "amount": 2672.3,
+      "amount_change": 694.8,
+      "limit_up_count": null,
+      "limit_up_density": null,
+      "valid_count": 3,
+      "indicators": {
+        "board_change": {
+          "label": "板块涨幅",
+          "weight": 0.2,
+          "value": 10.55,
+          "valid": true,
+          "pctile": 100.0
+        },
+        "relative_strength": {
+          "label": "相对大盘强度",
+          "weight": 0.2,
+          "value": 7.31,
+          "valid": true,
+          "pctile": 100.0
+        },
+        "up_ratio": {
+          "label": "上涨家数占比",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        },
+        "amount_change": {
+          "label": "成交额变化",
+          "weight": 0.2,
+          "value": 694.8,
+          "valid": true,
+          "pctile": 100.0
+        },
+        "limit_up_density": {
+          "label": "涨停密度",
+          "weight": 0.2,
+          "value": null,
+          "valid": false
+        }
+      },
+      "raw_score": 100.0,
+      "representative_stocks": [],
+      "representative_note": "板块成分股映射未接入，暂无法提供该板块内的代表性个股；"
+    },
+    "benchmark": 3.24,
+    "benchmark_name": "中证全指(沪深合计代理)",
+    "note": "v1 行业共振为「可用指标简版」：上涨家数占比、涨停密度需板块成分股数据，当前未接入，故最多 3/5 项有效，未达「≥4 项入主榜」的完整共振门槛，评分仅供参考，不得视为完整共振结论。概念板块未采集。",
+    "qualified_full": false
+  },
+  "sector_rankings": {
+    "industry": {
+      "red": [
+        {
+          "name": "半导体",
+          "change": 10.55,
+          "amount": 2672.3,
+          "ratio": 13.11,
+          "amount_change": 694.8
+        },
+        {
+          "name": "贵金属",
+          "change": 10.08,
+          "amount": 286.1,
+          "ratio": 1.4,
+          "amount_change": null
+        },
+        {
+          "name": "电子化学品",
+          "change": 9.0,
+          "amount": 310.5,
+          "ratio": 1.52,
+          "amount_change": 102.6
+        },
+        {
+          "name": "元件",
+          "change": 7.14,
+          "amount": 1078.5,
+          "ratio": 5.29,
+          "amount_change": 199.2
+        },
+        {
+          "name": "自动化设备",
+          "change": 6.04,
+          "amount": 488.6,
+          "ratio": 2.4,
+          "amount_change": 115.2
+        },
+        {
+          "name": "其他电子",
+          "change": 5.88,
+          "amount": 146.2,
+          "ratio": 0.72,
+          "amount_change": 31.9
+        },
+        {
+          "name": "通信设备",
+          "change": 5.73,
+          "amount": 1334.2,
+          "ratio": 6.55,
+          "amount_change": 227.5
+        },
+        {
+          "name": "其他电源设备",
+          "change": 5.25,
+          "amount": 131.9,
+          "ratio": 0.65,
+          "amount_change": null
+        },
+        {
+          "name": "非金属材料",
+          "change": 5.06,
+          "amount": 48.2,
+          "ratio": 0.24,
+          "amount_change": null
+        },
+        {
+          "name": "光伏设备",
+          "change": 5.04,
+          "amount": 347.9,
+          "ratio": 1.71,
+          "amount_change": null
+        }
+      ],
+      "black": [
+        {
+          "name": "白酒",
+          "change": -1.68,
+          "amount": 229.3,
+          "ratio": 1.13,
+          "amount_change": -1.4
+        },
+        {
+          "name": "饮料制造",
+          "change": -1.47,
+          "amount": 127.0,
+          "ratio": 0.62,
+          "amount_change": null
+        },
+        {
+          "name": "保险",
+          "change": -0.69,
+          "amount": 83.5,
+          "ratio": 0.41,
+          "amount_change": -24.7
+        },
+        {
+          "name": "食品加工制造",
+          "change": -0.35,
+          "amount": 129.2,
+          "ratio": 0.63,
+          "amount_change": null
+        },
+        {
+          "name": "厨卫电器",
+          "change": -0.24,
+          "amount": 11.2,
+          "ratio": 0.05,
+          "amount_change": null
+        },
+        {
+          "name": "银行",
+          "change": -0.18,
+          "amount": 436.6,
+          "ratio": 2.14,
+          "amount_change": null
+        },
+        {
+          "name": "油气开采及服务",
+          "change": -0.14,
+          "amount": 62.6,
+          "ratio": 0.31,
+          "amount_change": null
+        }
+      ],
+      "source": "ths",
+      "note": "口径：同花顺行业板块当日数据",
+      "as_of": null
+    },
+    "concept": {
+      "red": null,
+      "black": null,
+      "note": "概念板块数据尚未接入，暂不生成概念红黑榜。"
+    }
+  },
+  "stock_rankings": {
+    "red": [
+      {
+        "code": "920045",
+        "name": "蘅东光",
+        "change_pct": 21.8,
+        "amount": 10.19,
+        "is_limit_up": false
+      },
+      {
+        "code": "688507",
+        "name": "索辰科技",
+        "change_pct": 20.0,
+        "amount": 19.08,
+        "is_limit_up": true
+      },
+      {
+        "code": "688835",
+        "name": "高凯技术",
+        "change_pct": 20.0,
+        "amount": 7.14,
+        "is_limit_up": true
+      },
+      {
+        "code": "688809",
+        "name": "强一股份",
+        "change_pct": 20.0,
+        "amount": 8.02,
+        "is_limit_up": true
+      },
+      {
+        "code": "300489",
+        "name": "光智科技",
+        "change_pct": 20.0,
+        "amount": 23.19,
+        "is_limit_up": true
+      },
+      {
+        "code": "300788",
+        "name": "中信出版",
+        "change_pct": 20.0,
+        "amount": 5.86,
+        "is_limit_up": true
+      }
+    ],
+    "black": [
+      {
+        "code": "002029",
+        "name": "七 匹 狼",
+        "change": -9.970958709716797,
+        "amount": 16.14,
+        "board": "主板"
+      }
+    ],
+    "note": "个股红榜取当日「成交额≥5亿且涨幅≥5%」的高活跃上涨股；黑榜取「跌停且成交额≥10亿」个股。全市场涨跌个股榜需全市场快照，当前未接入。"
+  },
+  "risk_events": {
+    "events": [],
+    "coverage_status": "unavailable",
+    "message": "上市公司公告、交易所监管及权威媒体等风险事件来源尚未接入，本日风险事件覆盖不完整，无法判定「无风险事件」。",
+    "sources": [
+      {
+        "name": "巨潮资讯网",
+        "url": "https://www.cninfo.com.cn/",
+        "status": "未接入"
+      },
+      {
+        "name": "上交所披露",
+        "url": "https://www.sse.com.cn/disclosure/listedinfo/announcement/",
+        "status": "未接入"
+      },
+      {
+        "name": "深交所披露",
+        "url": "https://www.szse.cn/disclosure/",
+        "status": "未接入"
+      }
+    ]
+  },
+  "summary": "市场整体收涨（全A基准 +3.24%）。资金面回暖，量能放大。共振方向落在 行业「半导体」（涨幅 +10.55%，相对大盘 +7.31%），为当日相对强势方向。行业层面 半导体 领涨、白酒 领跌，结构分化明显。上市公司公告、交易所监管及权威媒体等风险事件来源尚未接入，本日风险事件覆盖不完整，无法判定「无风险事件」。以上为基于当日真实行情数据与确定性规则的自动观察，仅供复盘参考，不构成任何买卖建议。",
+  "source_coverage": {
+    "core_metrics": {
+      "status": "available",
+      "detail": "两市成交额、涨跌停、10亿以上家数、集中度、两融来自现有每日快照。"
+    },
+    "industry_board": {
+      "status": "available",
+      "detail": "行业板块涨跌 Top10（源：ths），仅含涨幅与成交额。"
+    },
+    "concept_board": {
+      "status": "unavailable",
+      "detail": "概念板块数据尚未接入。"
+    },
+    "board_constituents": {
+      "status": "unavailable",
+      "detail": "板块成分股映射尚未接入，上涨家数占比、涨停密度无法计算。"
+    },
+    "advance_decline": {
+      "status": "unavailable",
+      "detail": "全市场上涨/下跌家数需全市场快照，当前快照未落盘该字段。"
+    },
+    "risk_events": {
+      "status": "unavailable",
+      "detail": "上市公司公告（巨潮）、交易所监管、权威媒体等来源尚未接入。"
+    }
+  },
+  "data_warnings": [
+    "共振评分为「可用指标简版」（≤3/5 项有效），未达完整共振门槛，仅供参考。",
+    "个股红榜取当日「成交额≥5亿且涨幅≥5%」的高活跃上涨股；黑榜取「跌停且成交额≥10亿」个股。全市场涨跌个股榜需全市场快照，当前未接入。"
+  ],
+  "ai_generated": false,
+  "generation_mode": "规则自动生成（未接入 AI Provider）"
+}

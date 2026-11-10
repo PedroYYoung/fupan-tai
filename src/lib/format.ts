@@ -24,6 +24,20 @@ export function pctDelta(v: number | null | undefined, digits = 1): string {
   return `（${signed(v, digits)}%）`
 }
 
+/**
+ * 百分点变化括号（个股集中度 Top10/Top20/Top50 专用）：变化值 = 今日占比 − 昨日占比，
+ * 是两个百分比之间的差值，用「个百分点」表达而非 `%`。
+ *   `（+0.71 个百分点）` / `（-0.22 个百分点）` / `（0 个百分点）` / `（—）`
+ * 当比较基准回退到早于「前一交易日」的日期时，通过 cmpDate 传入真实比较日期，
+ * 渲染为 `（+0.71 个百分点，较 10/16）`，不冒充「昨日」。
+ */
+export function ppDelta(v: number | null | undefined, digits = 2, cmpDate: string | null = null): string {
+  if (v == null) return '（—）'
+  const val = v === 0 ? '0.00' : signed(v, digits)
+  const suffix = cmpDate ? `，较 ${cmpDate.slice(4, 6)}/${cmpDate.slice(6, 8)}` : ''
+  return `（${val} 个百分点${suffix}）`
+}
+
 /** 点位/金额等非百分比变化括号：`（+12.30）` / `（-419.17亿）` / `（—）` */
 export function numDelta(v: number | null | undefined, digits = 2, unit = ''): string {
   if (v == null) return '（—）'

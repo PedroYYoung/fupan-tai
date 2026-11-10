@@ -26,6 +26,8 @@ export const useDataStore = defineStore('data', () => {
   const isFallback = ref(false)
 
   let metaLoaded = false
+  // boot 竞争守卫：每次 boot 递增；loadDaily 返回后若序列号已变，说明有更新的 boot，丢弃本次结果
+  let bootSeq = 0
   const seriesCache = new Map<string, SeriesFile | null>()
 
   /** 序列文件按需加载 + 内存缓存（供各模块页复用） */
@@ -87,6 +89,10 @@ export const useDataStore = defineStore('data', () => {
    * 非法日期 / 缺失文件时自动回退最新交易日并弹黄色提示条
    */
   async function boot(): Promise<void> {
+    // 等待路由初始导航完成，避免 syncUrl 在 currentRoute 仍为 START_LOCATION 时
+    // 将深链接（如 /daily-observation、/observation-export/:date）误重定向到首页。
+    await router.isReady()
+    const seq = ++bootSeq
     loading.value = true
     warnMsg.value = ''
     try {
@@ -95,6 +101,7 @@ export const useDataStore = defineStore('data', () => {
           getJson<TradingDaysMeta>('/data/meta/trading_days.json'),
           getJson<LatestPointer>('/data/latest.json')
         ])
+        if (seq !== bootSeq) return
         meta.value = m
         latest.value = l
         metaLoaded = true
@@ -112,6 +119,7 @@ export const useDataStore = defineStore('data', () => {
           warnMsg.value = `日期 ${q} 不是有效交易日（最后更新：${lastUpdate}），已展示最近一个有效交易日 ${formatDay(l.latest)}`
         } else {
           const ok = await loadDaily(q)
+          if (seq !== bootSeq) return
           if (ok) {
             isFallback.value = false
             syncUrl(q)
@@ -123,8 +131,8 @@ export const useDataStore = defineStore('data', () => {
         isFallback.value = true
       }
 
-      // 回退到 latest
       const okLatest = await loadDaily(l.latest)
+      if (seq !== bootSeq) return
       if (!okLatest) {
         warnMsg.value = '数据文件缺失，站点暂无法展示（最后更新：' + lastUpdate + '）'
       }
@@ -132,7 +140,7 @@ export const useDataStore = defineStore('data', () => {
     } catch (e) {
       warnMsg.value = '数据加载失败：' + (e instanceof Error ? e.message : String(e))
     } finally {
-      loading.value = false
+      if (seq === bootSeq) loading.value = false
     }
   }
 
