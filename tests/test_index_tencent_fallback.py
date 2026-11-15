@@ -74,7 +74,8 @@ def test_tencent_index_amount_not_enabled_returns_none():
 def test_tencent_fallback_success(monkeypatch):
     """东财失败 → 腾讯备用通道返回正确亿元值。"""
     import akshare as ak
-    monkeypatch.setattr(ak, "index_zh_a_hist", lambda **kw: _raise(ValueError("东财挂了"))())
+    # raising=False：新版 akshare 已删除 index_zh_a_hist，兼容旧版本存在的情况
+    monkeypatch.setattr(ak, "index_zh_a_hist", lambda **kw: _raise(ValueError("东财挂了"))(), raising=False)
     monkeypatch.setattr(index_mod.requests, "get", _fake_get)
 
     amount = index_mod.get_index_amount("sh000001", "20261009")

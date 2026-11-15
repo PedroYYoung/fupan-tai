@@ -63,6 +63,31 @@ def _previous_trade_day(date: str, dates: list) -> str | None:
     return dates[i - 1] if i > 0 else None
 
 
+def _declare_real_zero_down(date: str):
+    """真实「0 家跌停」永久声明：追加到 limit_down.json 的 backfill.filled_dates。
+
+    背景：东财跌停接口成功返回空池时，当日确为真实 0 跌停。该 0 值在序列里合法，
+    但不在「历史回填清单」内，随交易日推移会滑出测试的「最近 N 交易日」豁免窗口，
+    被误判为「接口失败静默写 0」。故在增量构建时即永久声明，一劳永逸。
+    """
+    import json
+    path = os.path.join(DATA_DIR, "series", "limit_down.json")
+    if not os.path.exists(path):
+        return
+    with open(path, "r", encoding="utf-8") as f:
+        obj = json.load(f)
+    bf = obj.get("backfill") or {}
+    dates = list(bf.get("filled_dates") or [])
+    if date not in dates:
+        dates.append(date)
+        dates.sort()
+        bf["filled_dates"] = dates
+        bf["filled_days"] = len(dates)
+        obj["backfill"] = bf
+        atomic_write_json(path, obj)
+        log(f"已永久声明真实 0 跌停日 {date}（ld_ok=True）")
+
+
 # ---- 实时派生数据状态（写入 daily/{date}.json 的 data_quality.spot_derived）----
 SPOT_REALTIME = "realtime"        # 本次由实时快照抓取（目标日 = 最近已收盘交易日）
 SPOT_CARRIED = "carried_over"     # 历史日期重建：沿用旧快照中当时写入的真实值
@@ -528,6 +553,10 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
         compute.update_series("limit_up_down", "涨停家数", "家", date, limit_up)
     if limit_down is not None:
         compute.update_series("limit_down", "跌停家数", "家", date, limit_down)
+        if limit_down == 0 and pools.get("ld_ok"):
+            # 真实 0 跌停（东财接口成功返回空池）→ 永久声明到 filled_dates，
+            # 避免随交易日推移滑出「最近 N 交易日」豁免窗口后被误判为「失败写 0」。
+            _declare_real_zero_down(date)
     if over_cnt is not None:
         compute.update_series("over_10e_count", "10亿以上家数", "家", date, over_cnt)
     if conc and conc.get("top10_total") is not None:
