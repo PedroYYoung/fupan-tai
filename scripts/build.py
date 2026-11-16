@@ -230,8 +230,16 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
     existing = _load_daily(date)
 
     spot_df = None
+    spot_error = None
     if realtime:
-        spot_df = spot_mod.get_spot(date)
+        try:
+            spot_df = spot_mod.get_spot(date)
+        except Exception as e:  # noqa: BLE001
+            # 全市场快照三通道（东财/efinance/腾讯）均失败时，不得丢弃当日其他已成功
+            # 获取的真实行情（指数收盘/成交额、两融、涨跌停池、行业板块）。
+            # 仅将依赖快照的派生字段标记为 unavailable，其余真实数据照常写入。
+            spot_error = str(e)[:300]
+            log(f"{date} 全市场快照不可用，降级为「仅快照派生字段缺失」模式：{spot_error}")
     else:
         log(f"{date} 非最近已收盘交易日（{last_closed_trade_date(dates)}）："
             "实时快照只返回当前会话行情，本日不抓取、不写入实时派生字段")
@@ -444,6 +452,11 @@ def build_one(date: str, dates: list, backfill_days: int = 0):
         conc = compute.concentration(spot_df)
     else:
         spot_state, spot_note = _carried_spot_state(existing)
+        if spot_error is not None and spot_state != SPOT_CARRIED:
+            # 本次快照确实抓取失败：不得用旧快照或占位冒充当日真实派生数据
+            spot_state = SPOT_UNAVAILABLE
+            spot_note = (f"全市场快照三通道均失败，快照派生字段不可用：{spot_error}；"
+                         "指数/两融/涨跌停/行业等真实数据已正常写入")
         if spot_state == SPOT_CARRIED:
             _ov = (existing or {}).get("overview") or {}
             over_cnt = _ov.get("over_10e_count")

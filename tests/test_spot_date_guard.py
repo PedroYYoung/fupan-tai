@@ -292,6 +292,49 @@ def test_latest_day_uses_realtime_spot_flow(monkeypatch, tmp_path):
     assert LATEST in _series_dates(data_dir, "top10_concentration")
 
 
+def test_spot_failure_keeps_dated_sources_and_marks_unavailable(monkeypatch, tmp_path):
+    """实时快照三通道失败：不得丢弃当日其余已获取的真实行情。
+
+    根因（2026-11-16）：东财限流 + efinance JSON 错误 + 腾讯成分清单为空，
+    三通道全挂后旧逻辑整日丢弃，latest 停留在 20261113；
+    而指数收盘/成交额、两融、涨跌停池、行业板块此时均已有真实值。
+    """
+    data_dir, calls = _prepare_env(monkeypatch, tmp_path)
+
+    def _boom(date=None):
+        calls["spot"] += 1
+        raise RuntimeError("东财/efinance/腾讯三通道均失败")
+
+    monkeypatch.setattr(build_main.spot_mod, "get_spot", _boom)
+
+    build_main.build_one(LATEST, DATES)
+    d = _read(data_dir, LATEST)
+
+    assert calls["spot"] == 1
+    assert d["data_quality"]["spot_derived"] == "unavailable"
+    assert "三通道" in (d["data_quality"]["note"] or "")
+
+    # 按日期查询的可靠源必须照常写入，不随快照失败一起丢弃
+    vol = {r["code"]: r for r in d["index_volume"]}
+    assert vol["sh000001"]["amount"] == 1000.0
+    assert vol["sh000001"]["amount_date"] == LATEST
+    assert vol["sh000001"]["close"] == 3000.0
+    assert d["overview"]["total_amount"] == 2000.0
+    assert d["overview"]["limit_up"] == 1
+    assert d["overview"]["limit_down"] == 1
+    assert calls["industry"] == 1
+
+    # 仅快照派生字段置空，绝不伪造
+    assert d["overview"]["over_10e_count"] is None
+    assert d["concentration"]["top10_total"] is None
+    assert d["liquidity"]["mktcap_buckets"] == []
+    assert d["active_stocks"] == []
+
+    # 日线与 latest 均已推进，前端不再停留在上一交易日
+    with open(os.path.join(data_dir, "latest.json"), encoding="utf-8") as f:
+        assert json.load(f)["latest"] == LATEST
+
+
 def test_latest_day_then_historical_rerun_keeps_realtime_data(monkeypatch, tmp_path):
     """先跑最新日（写入真实值），再重跑同日→仍为实时流程，数值不变"""
     data_dir, _ = _prepare_env(monkeypatch, tmp_path)
