@@ -151,16 +151,27 @@ def test_tencent_spot_field_positions_and_units(monkeypatch):
 # ---------------------------------------------------------------- build.py 异常处理
 
 def test_build_failure_path_notifies_without_name_error(monkeypatch):
-    """单日构建失败：record_error + notify.notify_failure 都被调用，不再 NameError"""
+    """单日构建失败：record_error + notify.notify_failure 都被调用，不再 NameError。
+
+    注意：全市场快照失败自 2026-11-16 起已降级为「仅快照派生字段缺失」，
+    不再属于整日构建失败；因此这里直接让 build_one 抛异常来验证 main 的
+    失败通知链路，避免把两类失败路径混为一谈。
+    """
     calls = []
-    boom = _raise(spot_mod.SpotFetchError("全市场快照三通道均失败"))
-    monkeypatch.setattr(build_main.spot_mod, "get_spot", lambda *a, **k: boom())
     monkeypatch.setattr(build_main.calendar_mod, "get_trade_dates",
                         lambda: ["20261009", "20261010"])
+
+    def _fail(*args, **kwargs):
+        raise RuntimeError("构造的单日构建失败")
+
+    monkeypatch.setattr(build_main, "build_one", _fail)
     monkeypatch.setattr(build_main, "record_error",
                         lambda msg: calls.append(("record_error", msg)))
     monkeypatch.setattr(build_main.notify, "notify_failure",
                         lambda t, c: calls.append(("notify", t, c)))
+    # 涨跌停自愈会触发真实网络，测试中屏蔽
+    from modules import backfill
+    monkeypatch.setattr(backfill, "heal_recent_limit_pools", lambda *a, **k: None)
     monkeypatch.setattr(sys, "argv", ["build.py", "--date", "20261010"])
 
     build_main.main()  # 不得抛出任何异常（含 NameError）
