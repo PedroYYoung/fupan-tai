@@ -73,6 +73,35 @@ def backfill_series(window: list, dates: list):
     log("===== 序列回补完成（over_10e/市值分档/集中度无法历史回补，自启用日起累积）=====")
 
 
+def _declare_zero_down_from_heal(dates_zero: list):
+    """把自愈回补得到的真实 0 跌停日永久登记到 limit_down.json 的 backfill.filled_dates。
+
+    东财跌停池成功返回空池（ld_ok=True）时，当日确为真实 0 跌停。该 0 值不在
+    历史回填清单内，随交易日推移会滑出「最近 N 交易日」豁免窗口，被
+    test_no_zero_substitution_for_missing_days 误判为「失败写 0」而阻断 CI。
+    与主构建路径 build._declare_real_zero_down 保持同一口径，此处覆盖自愈回补的历史日。
+    """
+    import json
+    import os
+    from .common import DATA_DIR, atomic_write_json
+    path = os.path.join(DATA_DIR, "series", "limit_down.json")
+    if not os.path.exists(path) or not dates_zero:
+        return
+    with open(path, "r", encoding="utf-8") as f:
+        obj = json.load(f)
+    bf = obj.get("backfill") or {}
+    known = set(bf.get("filled_dates") or [])
+    added = [d for d in dates_zero if d not in known]
+    if not added:
+        return
+    fd = sorted(known | set(added))
+    bf["filled_dates"] = fd
+    bf["filled_days"] = len(fd)
+    obj["backfill"] = bf
+    atomic_write_json(path, obj)
+    log(f"已声明自愈回补的真实 0 跌停日 {added}")
+
+
 # 跌停池服务端保留窗口（自然日）。窗口外的日期永远补不回来，只能标记缺口。
 LIMIT_POOL_HEAL_DAYS = 25
 # 东财跌停池实际按自然日保留约 30 天，留 2 天缓冲；更早的日期请求必然返回空池（不可信），
@@ -133,6 +162,9 @@ def heal_recent_limit_pools(dates: list, target: str, days: int = LIMIT_POOL_HEA
         compute.write_series_merge("limit_up_down", "涨停家数", "家", lu_fill)
     if ld_fill:
         compute.write_series_merge("limit_down", "跌停家数", "家", ld_fill)
+        # 自愈回补的日必为 ld_ok=True（见上方写入条件）；其中真实 0 跌停日即时声明，
+        # 避免滑出豁免窗口后被完整性测试误判为失败写 0（20261110/11 即此类复发）。
+        _declare_zero_down_from_heal([d for d, v in ld_fill.items() if v == 0])
     filled = sorted(set(lu_fill) | set(ld_fill))
     log(f"涨跌停窗口自愈：可补窗口内 {len(reachable)} 天，补齐 {len(filled)} 天，"
         f"仍缺 {len(missing)} 天（跌停池超窗部分永久缺失，前端断点显示）")
